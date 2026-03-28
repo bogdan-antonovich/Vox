@@ -24,13 +24,16 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 	"vox/internal"
+	"vox/internal/auth"
 	lokisync "vox/pkg/loki"
 	"vox/pkg/models"
 
@@ -39,6 +42,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/crypto/argon2"
 )
 
 const (
@@ -235,7 +239,38 @@ func newLogger() (*zap.Logger, zap.AtomicLevel, *os.File, *os.File) {
 	return zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel)), atom, infoFile, errFile
 }
 
-func e2eTestUser(pool *pgxpool.Pool) {
+func newE2ETestUser(cfg *models.Config, pool *pgxpool.Pool, logger *zap.Logger) {
+	ctx := context.Background()
+
+	var count int
+	err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE id = $1", cfg.E2ETestUserLogin).Scan(&count)
+	if err != nil {
+		panic(err)
+	}
+	if count > 0 {
+		return
+	}
+
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		panic(err)
+	}
+	hash := argon2.IDKey([]byte(cfg.E2ETestUserPassword), salt, 1, 64*1024, 4, 32)
+	result := hex.EncodeToString(hash) + "$" + hex.EncodeToString(salt)
+
+	u := auth.UserInfo{
+		ID:             cfg.E2ETestUserLogin,
+		Name:           "John Doe",
+		Email:          "john.doe@example.com",
+		UserProviderID: cfg.E2ETestUserLogin,
+		ProviderID:     -3,
+	}
+
+	db := auth.NewAuthDB(&models.Pool{Pool: pool})
+	err = db.AddNewManualUser(ctx, logger, u, []byte(result))
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
@@ -246,5 +281,6 @@ func main() {
 
 	cfg := newConfig()
 	pool := models.Pool{Pool: newPool(context.Background(), logger)}
+	newE2ETestUser(&cfg, pool.Pool, logger)
 	internal.NewRouter(&cfg, &pool, logger, atom)
 }
