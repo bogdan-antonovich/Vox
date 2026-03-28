@@ -1,11 +1,13 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAudioRecorder } from '../hooks/useAudioRecorder';
-import { hubApi } from '../api';
-import { VoxLogo } from '../components/VoxLogo';
-import { Button } from '../components/Button';
-import { Waveform } from '../components/Waveform';
-import { Card } from '../components/Card';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import { hubApi } from "../api";
+import { VoxLogo } from "../components/VoxLogo";
+import { Button } from "../components/Button";
+import { Waveform } from "../components/Waveform";
+import { Card } from "../components/Card";
+import type { VoiceReference } from "../types";
+import { voiceApi } from "../api";
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -17,23 +19,36 @@ export function HostBroadcastPage() {
     useAudioRecorder();
 
   const [copied, setCopied] = useState(false);
+  const [voiceRefs, setVoiceRefs] = useState<VoiceReference[]>([]);
+  const [selectedFileId, setSelectedFileId] = useState<string>("");
+  const [isLoadingVoice, setIsLoadingVoice] = useState(true);
 
-  // XHR ref — each audio chunk is sent as a separate POST
   const xhrRef = useRef<XMLHttpRequest | null>(null);
 
-  // ── Send each audio chunk to the publish endpoint ─────────────────────────
+  // Fetch voice samples on mount
+  useEffect(() => {
+    voiceApi
+      .getMeta()
+      .then(({ data }) => {
+        setVoiceRefs(data || []);
+        if (data?.length) setSelectedFileId(data[0].file_id); // auto-select first
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingVoice(false));
+  }, []);
+
   const publishChunk = useCallback(
     (chunk: Blob) => {
-      if (!hubId) return;
-      const url = hubApi.getPublishUrl(hubId, 'ru');
+      if (!hubId || !selectedFileId) return;
+      const url = hubApi.getPublishUrl(hubId, "ru", selectedFileId);
       const xhr = new XMLHttpRequest();
       xhrRef.current = xhr;
-      xhr.open('POST', url, true);
+      xhr.open("POST", url, true);
       xhr.withCredentials = true;
-      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.setRequestHeader("Content-Type", "application/octet-stream");
       xhr.send(chunk);
     },
-    [hubId]
+    [hubId, selectedFileId],
   );
 
   const handleStart = async () => {
@@ -54,40 +69,44 @@ export function HostBroadcastPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+    >
       {/* Nav */}
       <nav
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 40px',
-          borderBottom: '1px solid var(--border)',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px 40px",
+          borderBottom: "1px solid var(--border)",
         }}
       >
         <VoxLogo size={26} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Hub:</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+            Hub:
+          </span>
           <code
             style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              padding: '4px 10px',
-              fontSize: '12px',
-              color: 'var(--text-secondary)',
-              maxWidth: '200px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border)",
+              borderRadius: "6px",
+              padding: "4px 10px",
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              maxWidth: "200px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {hubId}
           </code>
           <Button size="sm" variant="secondary" onClick={handleCopyId}>
-            {copied ? '✓' : 'Copy'}
+            {copied ? "✓" : "Copy"}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => navigate('/host')}>
+          <Button size="sm" variant="ghost" onClick={() => navigate("/host")}>
             ← Back
           </Button>
         </div>
@@ -97,67 +116,67 @@ export function HostBroadcastPage() {
       <main
         style={{
           flex: 1,
-          maxWidth: '760px',
-          margin: '0 auto',
-          padding: '64px 24px',
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '28px',
+          maxWidth: "760px",
+          margin: "0 auto",
+          padding: "64px 24px",
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          gap: "28px",
         }}
       >
         {/* Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <div
             style={{
-              width: '10px',
-              height: '10px',
-              borderRadius: '50%',
-              background: isRecording ? 'var(--error)' : 'var(--text-muted)',
-              boxShadow: isRecording ? '0 0 10px var(--error)' : 'none',
-              animation: isRecording ? 'pulse 1.5s ease infinite' : 'none',
+              width: "10px",
+              height: "10px",
+              borderRadius: "50%",
+              background: isRecording ? "var(--error)" : "var(--text-muted)",
+              boxShadow: isRecording ? "0 0 10px var(--error)" : "none",
+              animation: isRecording ? "pulse 1.5s ease infinite" : "none",
             }}
           />
           <span
             style={{
               fontFamily: "'Syne', sans-serif",
-              fontSize: '24px',
+              fontSize: "24px",
               fontWeight: 700,
             }}
           >
-            {isRecording ? 'Broadcasting Live' : 'Ready to Broadcast'}
+            {isRecording ? "Broadcasting Live" : "Ready to Broadcast"}
           </span>
         </div>
 
         {/* Waveform card — the centrepiece */}
-        <Card glowing={isRecording} style={{ padding: '32px' }}>
+        <Card glowing={isRecording} style={{ padding: "32px" }}>
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '24px',
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "24px",
             }}
           >
             <span
               style={{
-                fontSize: '12px',
-                color: 'var(--text-muted)',
+                fontSize: "12px",
+                color: "var(--text-muted)",
                 fontWeight: 500,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
               }}
             >
               Microphone input
             </span>
             <span
               style={{
-                fontSize: '12px',
-                color: isRecording ? 'var(--error)' : 'var(--text-muted)',
+                fontSize: "12px",
+                color: isRecording ? "var(--error)" : "var(--text-muted)",
                 fontWeight: 500,
               }}
             >
-              {isRecording ? '● REC · Russian → English' : '○ Idle'}
+              {isRecording ? "● REC · Russian → English" : "○ Idle"}
             </span>
           </div>
 
@@ -172,20 +191,86 @@ export function HostBroadcastPage() {
           {error && (
             <p
               style={{
-                marginTop: '16px',
-                color: 'var(--error)',
-                fontSize: '13px',
-                background: 'rgba(248,113,113,0.08)',
-                border: '1px solid rgba(248,113,113,0.15)',
-                borderRadius: '8px',
-                padding: '10px 14px',
+                marginTop: "16px",
+                color: "var(--error)",
+                fontSize: "13px",
+                background: "rgba(248,113,113,0.08)",
+                border: "1px solid rgba(248,113,113,0.15)",
+                borderRadius: "8px",
+                padding: "10px 14px",
               }}
             >
               ⚠ {error}
             </p>
           )}
 
-          <div style={{ marginTop: '28px' }}>
+          {/* Voice sample selector */}
+          <div style={{ marginBottom: "16px" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "12px",
+                color: "var(--text-muted)",
+                fontWeight: 500,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                marginBottom: "8px",
+              }}
+            >
+              Voice sample
+            </label>
+
+            {isLoadingVoice ? (
+              <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                Loading…
+              </p>
+            ) : voiceRefs.length === 0 ? (
+              <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                No samples yet —{" "}
+                <button
+                  onClick={() => navigate("/profile")}
+                  style={{
+                    color: "var(--accent)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                  }}
+                >
+                  upload one in Profile →
+                </button>
+              </p>
+            ) : (
+              <select
+                value={selectedFileId}
+                onChange={(e) => setSelectedFileId(e.target.value)}
+                disabled={isRecording}
+                style={{
+                  width: "100%",
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  padding: "10px 12px",
+                  fontSize: "13px",
+                  color: "var(--text-primary)",
+                  cursor: isRecording ? "not-allowed" : "pointer",
+                  appearance: "none",
+                  outline: "none",
+                }}
+              >
+                {voiceRefs.map((vr) => (
+                  <option key={vr.file_id} value={vr.file_id}>
+                    🎙{" "}
+                    {vr.text
+                      ? vr.text.slice(0, 50) + (vr.text.length > 50 ? "…" : "")
+                      : `Sample ${vr.file_id.slice(0, 8)}…`}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div style={{ marginTop: "28px" }}>
             {!isRecording ? (
               <Button onClick={handleStart} size="lg" fullWidth>
                 🎙 Start Broadcasting
@@ -195,7 +280,7 @@ export function HostBroadcastPage() {
                 onClick={handleStop}
                 size="lg"
                 fullWidth
-                style={{ background: 'var(--error)' }}
+                style={{ background: "var(--error)" }}
               >
                 ⏹ Stop Broadcasting
               </Button>
@@ -207,30 +292,30 @@ export function HostBroadcastPage() {
         <Card>
           <p
             style={{
-              fontSize: '14px',
-              color: 'var(--text-secondary)',
-              marginBottom: '14px',
+              fontSize: "14px",
+              color: "var(--text-secondary)",
+              marginBottom: "14px",
             }}
           >
             Share this Hub ID with your listeners — they don't need an account:
           </p>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <code
               style={{
                 flex: 1,
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                fontSize: '13px',
-                color: 'var(--text-primary)',
-                wordBreak: 'break-all',
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border)",
+                borderRadius: "8px",
+                padding: "12px 16px",
+                fontSize: "13px",
+                color: "var(--text-primary)",
+                wordBreak: "break-all",
               }}
             >
               {hubId}
             </code>
             <Button variant="secondary" onClick={handleCopyId}>
-              {copied ? '✓ Copied' : 'Copy'}
+              {copied ? "✓ Copied" : "Copy"}
             </Button>
           </div>
         </Card>
@@ -238,21 +323,21 @@ export function HostBroadcastPage() {
         {/* Tip */}
         <p
           style={{
-            fontSize: '13px',
-            color: 'var(--text-muted)',
-            textAlign: 'center',
+            fontSize: "13px",
+            color: "var(--text-muted)",
+            textAlign: "center",
             lineHeight: 1.6,
           }}
         >
-          Want your voice to sound like you in translation?{' '}
+          Want your voice to sound like you in translation?{" "}
           <button
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate("/profile")}
             style={{
-              color: 'var(--accent)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13px',
+              color: "var(--accent)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "13px",
             }}
           >
             Upload a voice sample →

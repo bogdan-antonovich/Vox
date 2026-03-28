@@ -50,8 +50,8 @@ export const hubApi = {
   getListenUrl: (hubId: string) =>
     `https://bogdanantonovich.com/vox/api/hub/${hubId}/listen`,
 
-  getPublishUrl: (hubId: string, lang: string = "ru") =>
-    `https://bogdanantonovich.com/vox/api/hub/${hubId}/publish?lang=${lang}`,
+  getPublishUrl: (hubId: string, lang: string = "ru", fileId: string) =>
+    `https://bogdanantonovich.com/vox/api/hub/${hubId}/publish?lang=${lang}&file_id=${fileId}`,
 };
 
 // ─── Voice ───────────────────────────────────────────────────────────────────

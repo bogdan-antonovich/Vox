@@ -104,9 +104,8 @@ func (v *VoiceAPI) NewReferenceHandler(ctx *gin.Context) {
 // @Tags         voice
 // @Produce      json
 // @Success      200  {array}   VoiceReference  "List of voice reference metadata"
-//
 // @Failure      404  {object}  models.HttpErrorResponse       "Invalid user_id"
-// @Failure      403  {object}  models.HttpErrorResponse  "User is not authorized"
+// @Failure      403  {object}  models.HttpErrorResponse  	   "User is not authorized"
 // @Failure      500  {object}  models.HttpErrorResponse       "Internal server error"
 // @Security     CookieAuth
 // @Router       /user/voice/meta [get]
