@@ -6,8 +6,8 @@ import React, {
   useCallback,
   type ReactNode,
 } from "react";
-import { userApi } from "../api";
 import type { UserInfo } from "../types";
+import { userApi, authApi } from "../api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   refreshUser: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -38,12 +38,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    // Clear cookies via expired date — server manages httpOnly cookies,
-    // so we just clear local state and redirect
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // proceed with logout even if the API call fails
+    }
     setUser(null);
-    document.cookie = "access_token=; Max-Age=0; path=/";
-    document.cookie = "refresh_token=; Max-Age=0; path=/";
     window.location.href = "/vox";
   }, []);
 

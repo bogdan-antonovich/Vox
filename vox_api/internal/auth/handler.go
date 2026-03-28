@@ -397,3 +397,31 @@ func (a *AuthAPI) RefreshHandler(ctx *gin.Context) {
 	setTokenCookies(ctx, newAccess, newRefresh)
 	ctx.Status(http.StatusCreated)
 }
+
+// LogoutHandler godoc
+// @Summary      Clears the access and refresh token cookies
+// @Description  Clears the access and refresh token cookies from the client.
+// @Tags         auth
+// @Param        access_token   header  string  true  "Access token cookie"
+// @Param        refresh_token  header  string  true  "Refresh token cookie"
+// @Success      204  "Token pair refreshed successfully, new cookies set"
+// @Failure      400  {object}  models.HttpErrorResponse  "Access or refresh token cookie is missing"
+// @Router       /auth/logout [delete]
+func (a *AuthAPI) LogoutHandler(ctx *gin.Context) {
+	log := mod.GetLogger(ctx)
+	_, err := ctx.Cookie("access_token")
+	if err != nil {
+		log.Warn("Access token cookie not found")
+		ctx.Data(http.StatusBadRequest, mod.APP_JSON, mod.HttpError(mod.MISSING_COOKIE_CODE, mod.MISSING_COOKIE_MSG))
+		return
+	}
+	_, err = ctx.Cookie("refresh_token")
+	if err != nil {
+		log.Warn("Refresh token cookie not found")
+		ctx.Data(http.StatusBadRequest, mod.APP_JSON, mod.HttpError(mod.MISSING_COOKIE_CODE, mod.MISSING_COOKIE_MSG))
+		return
+	}
+
+	setTokenCookies(ctx, "", "")
+	ctx.Status(http.StatusNoContent)
+}
