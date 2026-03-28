@@ -22,8 +22,6 @@ function HubCard({
   const [copied, setCopied] = useState(false);
 
   const handleDelete = async () => {
-    if (!window.confirm("Delete this hub? All listeners will be disconnected."))
-      return;
     setIsDeleting(true);
     try {
       await hubApi.delete(hubId, userId);
