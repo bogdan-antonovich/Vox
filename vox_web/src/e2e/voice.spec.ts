@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -7,10 +7,7 @@ import { loginAs } from "./helpers/auth";
  * Uploads a silent WebM blob via the API directly from the browser context.
  * Mirrors exactly what the ProfilePage does via voiceApi.upload().
  */
-async function uploadVoiceBlob(
-  page: typeof import("@playwright/test").Page.prototype,
-  textRef: string,
-) {
+async function uploadVoiceBlob(page: Page, textRef: string): Promise<number> {
   return page.evaluate(async (ref: string) => {
     const bytes = new Uint8Array(512);
     const blob = new Blob([bytes], { type: "audio/webm;codecs=opus" });

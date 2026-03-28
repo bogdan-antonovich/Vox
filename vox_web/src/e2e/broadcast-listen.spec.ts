@@ -1,28 +1,13 @@
-import { test, expect, type Browser } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Generates a minimal valid WebM/Opus blob in the browser context.
- * This is real audio data (silence) — enough for Deepgram to accept the stream.
- */
-const SILENT_WEBM_BASE64 =
-  // 1-second silent WebM Opus blob (pre-encoded, 4.1 KB)
-  "GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwH/////////" +
-  "FUmpZqkq17GDD0JARIg4AY3AQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawA" +
-  "QoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoaw" +
-  "AQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoa" +
-  "wAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoawAQoa";
-
-/**
  * Sends a single audio chunk to the publish endpoint from inside the browser,
  * using XHR exactly as HostBroadcastPage does.
  */
-async function publishChunk(
-  page: typeof import("@playwright/test").Page.prototype,
-  hubId: string,
-) {
+async function publishChunk(page: Page, hubId: string): Promise<number> {
   return page.evaluate(async (hid: string) => {
     // Build a minimal silent WebM blob
     const bytes = new Uint8Array(512); // silence
