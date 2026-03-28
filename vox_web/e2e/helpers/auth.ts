@@ -25,7 +25,7 @@ export async function loginAs(page: Page, credentials = TEST_CREDENTIALS) {
   await page.getByRole("button", { name: "Sign in" }).last().click();
 
   // Wait until we land on the dashboard
-  await page.waitForURL("**/host", { timeout: 10_000 });
+  await page.waitForURL("**/vox/host", { timeout: 10_000 });
 }
 
 /**
@@ -64,7 +64,7 @@ export async function signUpFresh(page: Page) {
   // Submit
   await page.getByRole("button", { name: "Create account" }).click();
 
-  await page.waitForURL("**/host", { timeout: 10_000 });
+  await page.waitForURL("**/vox/host", { timeout: 10_000 });
 
   return payload;
 }

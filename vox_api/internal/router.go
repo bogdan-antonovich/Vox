@@ -125,6 +125,7 @@ func NewRouter(cfg *models.Config, pool *models.Pool, logger *zap.Logger, atom z
 	corsGroups.GET("/auth/:provider/login", timeout, authAPI.LoginViaProviderHandler)
 	corsGroups.POST("/auth/login", timeout, authAPI.LoginHandler)
 	corsGroups.POST("/auth/sign_up", timeout, authAPI.SignUpHandler)
+	corsGroups.POST("/auth/refresh", timeout, authAPI.RefreshHandler)
 
 	corsGroups.POST("/hub", timeout, authAPI.IsAuthorized, hubAPI.PutCache(hostAndHubs), hubAPI.NewHubHandler)
 	corsGroups.DELETE("/hub/:hub_id", timeout, authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.PutCache(hostAndHubs), hubAPI.DeleteHubHandler)

@@ -82,6 +82,6 @@ test("logout → redirected to home, dashboard is inaccessible", async ({
   await expect(page).toHaveURL(/\//);
 
   // Trying to navigate to /host should redirect away (ProtectedRoute)
-  await page.goto("/host");
+  await page.goto("/vox/host");
   await expect(page).not.toHaveURL(/\/host/);
 });

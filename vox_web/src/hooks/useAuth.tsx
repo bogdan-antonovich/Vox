@@ -5,9 +5,9 @@ import React, {
   useEffect,
   useCallback,
   type ReactNode,
-} from 'react';
-import { userApi } from '../api';
-import type { UserInfo } from '../types';
+} from "react";
+import { userApi } from "../api";
+import type { UserInfo } from "../types";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,9 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clear cookies via expired date — server manages httpOnly cookies,
     // so we just clear local state and redirect
     setUser(null);
-    document.cookie = 'access_token=; Max-Age=0; path=/';
-    document.cookie = 'refresh_token=; Max-Age=0; path=/';
-    window.location.href = '/';
+    document.cookie = "access_token=; Max-Age=0; path=/";
+    document.cookie = "refresh_token=; Max-Age=0; path=/";
+    window.location.href = "/vox";
   }, []);
 
   useEffect(() => {
@@ -70,6 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
