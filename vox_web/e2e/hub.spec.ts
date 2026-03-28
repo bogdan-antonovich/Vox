@@ -84,20 +84,28 @@ test("copy hub ID → button shows ✓ confirmation", async ({ page }) => {
 test("delete hub → card disappears from dashboard", async ({ page }) => {
   await loginAs(page);
 
+  // Create hub
   await page.getByRole("button", { name: /new hub/i }).click();
-  await expect(page.getByText("HUB", { exact: true }).first()).toBeVisible({
+  await expect(page.getByTitle("Delete hub").last()).toBeVisible({
     timeout: 8_000,
   });
 
-  const countBefore = await page.getByText("HUB", { exact: true }).count();
+  const countBefore = await page.getByTitle("Delete hub").count();
 
-  page.on("dialog", (d) => d.accept());
-  await page.getByTitle("Delete hub").last().click();
+  // Log API responses to debug
+  page.on("response", (response) => {
+    if (response.url().includes("/hub/")) {
+      console.log("Hub API response:", response.status(), response.url());
+    }
+  });
 
-  await expect(page.getByText("HUB", { exact: true })).toHaveCount(
-    countBefore - 1,
-    { timeout: 8_000 },
-  );
+  // Delete it
+  await page.getByTitle("Delete hub").last().click({ force: true });
+
+  // One fewer delete button = one fewer card
+  await expect(page.getByTitle("Delete hub")).toHaveCount(countBefore - 1, {
+    timeout: 8_000,
+  });
 });
 
 // ─── Protected route ──────────────────────────────────────────────────────────

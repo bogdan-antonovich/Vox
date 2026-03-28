@@ -69,6 +69,27 @@ secrets:
     name: E2E_PASSWORD_FILE_${TAG}
 
 services:
+  traefik:
+    image: traefik:v3.3
+    command:
+      - "--providers.swarm=true"
+      - "--providers.swarm.exposedByDefault=false"
+      - "--providers.swarm.network=vox_network"
+      - "--entrypoints.web.address=:9081"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+    ports:
+      - "9081:9081"
+      - "7981:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - vox_network
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
   db:
     image: postgres:16-alpine
     environment:
@@ -152,8 +173,7 @@ services:
 
   vox:
     image: ${DOCKER_REGISTRY}/vox:${TAG}
-    ports:
-      - "9081:9081"
+    # ports removed — traefik handles ingress now
     environment:
       PGX_MAX_CONNS: "${PGX_MAX_CONNS}"
       PGX_MIN_CONNS: "${PGX_MIN_CONNS}"
@@ -217,3 +237,11 @@ services:
         parallelism: 1
         order: start-first
         failure_action: rollback
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.vox.rule=PathPrefix(`/`)"
+        - "traefik.http.routers.vox.entrypoints=web"
+        - "traefik.http.services.vox.loadbalancer.server.port=9081"
+        - "traefik.http.services.vox.loadbalancer.sticky.cookie=true"
+        - "traefik.http.services.vox.loadbalancer.sticky.cookie.name=vox_sticky"
+        - "traefik.http.services.vox.loadbalancer.sticky.cookie.httpOnly=true"
