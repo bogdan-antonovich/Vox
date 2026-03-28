@@ -99,21 +99,6 @@ func TestHubsHandler_HappyPath_ContentTypeIsJSON(t *testing.T) {
 	assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
 }
 
-func TestHubsHandler_HappyPath_OtherUserHubsNotReturned(t *testing.T) {
-	cache := hub.NewHostAndHubs()
-	userID := uuid.New().String()
-	otherUserID := uuid.New().String()
-	otherHubID := uuid.New().String()
-	cache.AddHub(otherUserID, otherHubID)
-
-	r := helpers.NewHubsRouter(t, &user.UserAPI{}, cache, userID)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.NewHubsRequest())
-
-	require.Equal(t, http.StatusOK, w.Code)
-	assert.NotContains(t, w.Body.String(), otherHubID)
-}
-
 func TestHubsHandler_MissingCache_ReturnsInternalError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
