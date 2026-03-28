@@ -87,11 +87,6 @@ func timeout(c *gin.Context) {
 }
 
 func NewRouter(cfg *models.Config, pool *models.Pool, logger *zap.Logger, atom zap.AtomicLevel) {
-
-	logger.Info("Deepgram env values", zap.String("api_key", cfg.DeepgramAPIKey), zap.String("model", cfg.DeepgramModel), zap.String("base_url", cfg.DeepgramBaseURL))
-	logger.Info("GROQ env values", zap.String("api_key", cfg.GroqAPIKey), zap.String("model", cfg.GroqModel), zap.String("base_url", cfg.GroqBaseURL))
-	logger.Info("FishAudio env values", zap.String("api_key", cfg.FishAudioAPIKey), zap.String("base_url", cfg.FishAudioBaseURL))
-
 	userAPI := user.UserAPI{DB: user.NewUserDB(pool)}
 	authAPI := auth.AuthAPI{DB: auth.NewAuthDB(pool), Cfg: cfg}
 	hubAPI := hub.HubAPI{DB: hub.NewHubDB(pool), Cfg: cfg, MGR: hub.NewManager()}
