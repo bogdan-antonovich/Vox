@@ -70,11 +70,12 @@ secrets:
 
 services:
   traefik:
-    image: traefik:v3.3
+    image: traefik:v2.11
     command:
-      - "--providers.swarm=true"
-      - "--providers.swarm.exposedByDefault=false"
-      - "--providers.swarm.network=vox_network"
+      - "--providers.docker=true"
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--providers.docker.network=vox_network"
       - "--entrypoints.web.address=:9081"
       - "--api.dashboard=true"
       - "--api.insecure=true"
