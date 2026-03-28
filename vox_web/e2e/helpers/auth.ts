@@ -11,15 +11,18 @@ export const TEST_CREDENTIALS = {
  * Call this at the top of any test that requires authentication.
  */
 export async function loginAs(page: Page, credentials = TEST_CREDENTIALS) {
-  await page.goto("/");
+  await page.goto("/vox");
 
-  // Open login modal — the home page has a Sign In button
-  await page.getByRole("button", { name: /sign in/i }).click();
+  // "Sign in" button in the nav opens the AuthModal
+  await page.getByRole("button", { name: "Sign in" }).click();
 
-  // Fill credentials
-  await page.getByLabel(/login/i).fill(credentials.login);
-  await page.getByLabel(/password/i).fill(credentials.password);
-  await page.getByRole("button", { name: /^log in|^sign in/i }).click();
+  // Modal is now open — fill the form
+  // Field is labeled "Username" in the modal
+  await page.getByLabel("Username").fill(credentials.login);
+  await page.getByLabel("Password").fill(credentials.password);
+
+  // Submit button inside the form says "Sign in"
+  await page.getByRole("button", { name: "Sign in" }).last().click();
 
   // Wait until we land on the dashboard
   await page.waitForURL("**/host", { timeout: 10_000 });
@@ -38,16 +41,28 @@ export async function signUpFresh(page: Page) {
     name: `E2E User ${ts}`,
   };
 
-  await page.goto("/");
-  await page
-    .getByRole("button", { name: /sign up|create account|get started/i })
-    .click();
+  await page.goto("/vox");
 
-  await page.getByLabel(/email/i).fill(payload.email);
-  await page.getByLabel(/login|username/i).fill(payload.login);
-  await page.getByLabel(/name/i).fill(payload.name);
-  await page.getByLabel(/password/i).fill(payload.password);
-  await page.getByRole("button", { name: /sign up|create account/i }).click();
+  // Open modal via nav "Sign in" button
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  // Wait for modal to be fully rendered
+  await page.waitForSelector("text=Welcome back");
+
+  // Switch to sign up — target the toggle inside the <p> at the bottom of the modal
+  await page.locator("p").getByRole("button", { name: "Sign up" }).click();
+
+  // Wait for form to switch to sign-up mode
+  await page.waitForSelector("text=Create account");
+
+  // Fill sign up fields
+  await page.getByLabel("Full name").fill(payload.name);
+  await page.getByLabel("Email").fill(payload.email);
+  await page.getByLabel("Username").fill(payload.login);
+  await page.getByLabel("Password").fill(payload.password);
+
+  // Submit
+  await page.getByRole("button", { name: "Create account" }).click();
 
   await page.waitForURL("**/host", { timeout: 10_000 });
 

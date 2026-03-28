@@ -1,4 +1,4 @@
-import React, { type InputHTMLAttributes, type ReactNode } from 'react';
+import React, { type InputHTMLAttributes, type ReactNode } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -6,63 +6,67 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   icon?: ReactNode;
 }
 
-export function Input({ label, error, icon, style, ...rest }: InputProps) {
+export function Input({ label, error, icon, style, id, ...rest }: InputProps) {
+  const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {label && (
         <label
+          htmlFor={inputId}
           style={{
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
+            fontSize: "13px",
+            color: "var(--text-secondary)",
             fontWeight: 500,
           }}
         >
           {label}
         </label>
       )}
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: "relative" }}>
         {icon && (
           <span
             style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-muted)',
-              display: 'flex',
-              alignItems: 'center',
+              position: "absolute",
+              left: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--text-muted)",
+              display: "flex",
+              alignItems: "center",
             }}
           >
             {icon}
           </span>
         )}
         <input
+          id={inputId}
           style={{
-            width: '100%',
-            background: 'var(--bg-elevated)',
-            border: `1px solid ${error ? 'var(--error)' : 'var(--border)'}`,
-            borderRadius: '10px',
-            padding: icon ? '10px 14px 10px 38px' : '10px 14px',
-            fontSize: '14px',
-            color: 'var(--text-primary)',
-            outline: 'none',
-            transition: 'border-color 0.2s ease',
+            width: "100%",
+            background: "var(--bg-elevated)",
+            border: `1px solid ${error ? "var(--error)" : "var(--border)"}`,
+            borderRadius: "10px",
+            padding: icon ? "10px 14px 10px 38px" : "10px 14px",
+            fontSize: "14px",
+            color: "var(--text-primary)",
+            outline: "none",
+            transition: "border-color 0.2s ease",
             ...style,
           }}
           onFocus={(e) => {
             (e.target as HTMLInputElement).style.borderColor =
-              'var(--border-accent)';
+              "var(--border-accent)";
           }}
           onBlur={(e) => {
             (e.target as HTMLInputElement).style.borderColor = error
-              ? 'var(--error)'
-              : 'var(--border)';
+              ? "var(--error)"
+              : "var(--border)";
           }}
           {...rest}
         />
       </div>
       {error && (
-        <span style={{ fontSize: '12px', color: 'var(--error)' }}>{error}</span>
+        <span style={{ fontSize: "12px", color: "var(--error)" }}>{error}</span>
       )}
     </div>
   );
