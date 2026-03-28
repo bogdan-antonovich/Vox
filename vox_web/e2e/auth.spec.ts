@@ -75,13 +75,11 @@ test("logout → redirected to home, dashboard is inaccessible", async ({
 }) => {
   await loginAs(page);
 
-  // Click sign out
   await page.getByRole("button", { name: /sign out/i }).click();
+  await expect(page).toHaveURL("https://bogdanantonovich.com/vox");
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 
-  // Should land on home
-  await expect(page).toHaveURL(/\//);
-
-  // Trying to navigate to /host should redirect away (ProtectedRoute)
-  await page.goto("/vox/host");
-  await expect(page).not.toHaveURL(/\/host/);
+  // Navigate to protected route — expect redirect away from /host
+  await page.goto("/vox/host", { waitUntil: "commit" });
+  await expect(page).not.toHaveURL(/\/host$/);
 });

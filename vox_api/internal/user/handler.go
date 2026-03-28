@@ -59,6 +59,7 @@ func (u *UserAPI) InfoHandler(ctx *gin.Context) {
 // @Tags         user
 // @Produce      json
 // @Success      200  {object}  object{hub_ids=[]string}  "List of hub IDs"
+// @Success      204  {object}  nil  					  "No hubs found"
 // @Failure      400  {object}  models.HttpErrorResponse  "Invalid request body"
 // @Failure      403  {object}  models.HttpErrorResponse  "User is not authenticated"
 // @Failure      500  {object}  models.HttpErrorResponse  "Internal server error"
@@ -84,6 +85,10 @@ func (uapi *UserAPI) HubsHandler(ctx *gin.Context) {
 	switch cache := val.(type) {
 	case *hub.HostAndHubs:
 		ids := cache.GetHubs(userID)
+		if ids == nil {
+			ctx.Status(http.StatusNoContent)
+			return
+		}
 		ctx.Data(http.StatusOK, mod.APP_JSON, []byte(`{"hub_ids": ["`+strings.Join(ids, `", "`)+`"]}`))
 	default:
 		log.Error("Invalid host_and_hub_cache type")

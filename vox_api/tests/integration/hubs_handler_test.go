@@ -75,7 +75,7 @@ func TestHubsHandler_HappyPath_MultipleHubs(t *testing.T) {
 	assert.Contains(t, w.Body.String(), hubID2)
 }
 
-func TestHubsHandler_HappyPath_NoHubs_ReturnsEmptyArray(t *testing.T) {
+func TestHubsHandler_HappyPath_NoHubs_Returns204(t *testing.T) {
 	cache := hub.NewHostAndHubs()
 	userID := uuid.New().String()
 
@@ -83,8 +83,7 @@ func TestHubsHandler_HappyPath_NoHubs_ReturnsEmptyArray(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.NewHubsRequest())
 
-	require.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), `"hub_ids"`)
+	require.Equal(t, http.StatusNoContent, w.Code)
 }
 
 func TestHubsHandler_HappyPath_ContentTypeIsJSON(t *testing.T) {
