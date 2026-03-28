@@ -13,7 +13,7 @@ import "./styles/globals.css";
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/vox">
       <AuthProvider>
         <Routes>
           {/* Public */}
