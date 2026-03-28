@@ -10,7 +10,7 @@ import (
 
 type UserDB interface {
 	GetUserInfo(ctx context.Context, log *zap.Logger, userID string) (u UserInfo, err error)
-	//GetHubs(ctx context.Context, log *zap.Logger, userID string) (hubs []string, err error)
+	// GetHubs(ctx context.Context, log *zap.Logger, userID string) (hubs []string, err error)
 }
 
 type PostgresUser struct{ *mod.Pool }
