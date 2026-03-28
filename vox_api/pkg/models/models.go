@@ -38,27 +38,29 @@ type Pool struct {
 }
 
 type Config struct {
-	JWTSecret          string
-	BaseURL            string
-	GithubClientID     string
-	GithubClientSecret string
-	GoogleClientID     string
-	GoogleClientSecret string
-	FrontendURL        string
-	GroqModel          string
-	GroqAPIKey         string
-	GroqBaseURL        string
-	FishAudioAPIKey    string
-	FishAudioBaseURL   string
-	DeepgramAPIKey     string
-	DeepgramBaseURL    string
-	DeepgramModel      string
-	GoogleTokenURL     string
-	GithubTokenURL     string
-	GoogleUserInfoURL  string
-	GithubUserInfoURL  string
-	StoragePath        string
-	AdminToken         string
+	JWTSecret           string
+	BaseURL             string
+	GithubClientID      string
+	GithubClientSecret  string
+	GoogleClientID      string
+	GoogleClientSecret  string
+	FrontendURL         string
+	GroqModel           string
+	GroqAPIKey          string
+	GroqBaseURL         string
+	FishAudioAPIKey     string
+	FishAudioBaseURL    string
+	DeepgramAPIKey      string
+	DeepgramBaseURL     string
+	DeepgramModel       string
+	GoogleTokenURL      string
+	GithubTokenURL      string
+	GoogleUserInfoURL   string
+	GithubUserInfoURL   string
+	StoragePath         string
+	AdminToken          string
+	E2ETestUserLogin    string
+	E2ETestUserPassword string
 }
 
 type HttpErrorResponse struct {

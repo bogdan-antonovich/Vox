@@ -72,27 +72,29 @@ func getEnv(key string) string {
 
 func newConfig() models.Config {
 	return models.Config{
-		JWTSecret:          readFile(getEnv("JWT_SECRET_FILE")),
-		GithubClientID:     readFile(getEnv("GH_CLIENT_ID_FILE")),
-		GithubClientSecret: readFile(getEnv("GH_CLIENT_SECRET_FILE")),
-		GoogleClientID:     readFile(getEnv("GOOGLE_CLIENT_ID_FILE")),
-		GoogleClientSecret: readFile(getEnv("GOOGLE_CLIENT_SECRET_FILE")),
-		GroqAPIKey:         readFile(getEnv("GROQ_API_KEY_FILE")),
-		FishAudioAPIKey:    readFile(getEnv("FISH_AUDIO_API_KEY_FILE")),
-		DeepgramAPIKey:     readFile(getEnv("DEEPGRAM_API_KEY_FILE")),
-		AdminToken:         readFile(getEnv("ADMIN_TOKEN_FILE")),
-		BaseURL:            getEnv("BASE_URL"),
-		FrontendURL:        getEnv("FRONTEND_URL"),
-		GroqModel:          getEnv("GROQ_MODEL"),
-		GroqBaseURL:        getEnv("GROQ_BASE_URL"),
-		FishAudioBaseURL:   getEnv("FISH_AUDIO_BASE_URL"),
-		DeepgramBaseURL:    getEnv("DEEPGRAM_BASE_URL"),
-		DeepgramModel:      getEnv("DEEPGRAM_MODEL"),
-		GoogleTokenURL:     getEnv("GOOGLE_TOKEN_URL"),
-		GithubTokenURL:     getEnv("GH_TOKEN_URL"),
-		GoogleUserInfoURL:  getEnv("GOOGLE_USER_INFO_URL"),
-		GithubUserInfoURL:  getEnv("GH_USER_INFO_URL"),
-		StoragePath:        getEnv("STORAGE_PATH"),
+		JWTSecret:           readFile(getEnv("JWT_SECRET_FILE")),
+		GithubClientID:      readFile(getEnv("GH_CLIENT_ID_FILE")),
+		GithubClientSecret:  readFile(getEnv("GH_CLIENT_SECRET_FILE")),
+		GoogleClientID:      readFile(getEnv("GOOGLE_CLIENT_ID_FILE")),
+		GoogleClientSecret:  readFile(getEnv("GOOGLE_CLIENT_SECRET_FILE")),
+		GroqAPIKey:          readFile(getEnv("GROQ_API_KEY_FILE")),
+		FishAudioAPIKey:     readFile(getEnv("FISH_AUDIO_API_KEY_FILE")),
+		DeepgramAPIKey:      readFile(getEnv("DEEPGRAM_API_KEY_FILE")),
+		AdminToken:          readFile(getEnv("ADMIN_TOKEN_FILE")),
+		BaseURL:             getEnv("BASE_URL"),
+		FrontendURL:         getEnv("FRONTEND_URL"),
+		GroqModel:           getEnv("GROQ_MODEL"),
+		GroqBaseURL:         getEnv("GROQ_BASE_URL"),
+		FishAudioBaseURL:    getEnv("FISH_AUDIO_BASE_URL"),
+		DeepgramBaseURL:     getEnv("DEEPGRAM_BASE_URL"),
+		DeepgramModel:       getEnv("DEEPGRAM_MODEL"),
+		GoogleTokenURL:      getEnv("GOOGLE_TOKEN_URL"),
+		GithubTokenURL:      getEnv("GH_TOKEN_URL"),
+		GoogleUserInfoURL:   getEnv("GOOGLE_USER_INFO_URL"),
+		GithubUserInfoURL:   getEnv("GH_USER_INFO_URL"),
+		StoragePath:         getEnv("STORAGE_PATH"),
+		E2ETestUserLogin:    getEnv("E2E_LOGIN"),
+		E2ETestUserPassword: readFile(getEnv("E2E_PASSWORD_FILE")),
 	}
 }
 
@@ -231,6 +233,9 @@ func newLogger() (*zap.Logger, zap.AtomicLevel, *os.File, *os.File) {
 	)
 
 	return zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel)), atom, infoFile, errFile
+}
+
+func e2eTestUser(pool *pgxpool.Pool) {
 }
 
 func main() {

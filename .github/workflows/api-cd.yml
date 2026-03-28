@@ -92,7 +92,9 @@ jobs:
             GH_TOKEN_URL,
             GOOGLE_USER_INFO_URL,
             GH_USER_INFO_URL,
-            STORAGE_PATH
+            STORAGE_PATH,
+            E2E_LOGIN,
+            E2E_PASSWORD
           script: |
             set -euo pipefail
 
@@ -136,6 +138,7 @@ jobs:
             sync_secret "GOOGLE_CLIENT_ID_FILE"     "$GOOGLE_CLIENT_ID"
             sync_secret "GOOGLE_CLIENT_SECRET_FILE" "$GOOGLE_CLIENT_SECRET"
             sync_secret "ADMIN_TOKEN_FILE"          "$ADMIN_TOKEN"
+            sync_secret "E2E_PASSWORD_FILE"         "$E2E_PASSWORD"
 
             sync_config "loki_config" ~/vox_api/cfg/loki-config.yml
 
@@ -148,6 +151,7 @@ jobs:
             export FISH_AUDIO_BASE_URL DEEPGRAM_BASE_URL DEEPGRAM_MODEL
             export GOOGLE_TOKEN_URL GH_TOKEN_URL
             export GOOGLE_USER_INFO_URL GH_USER_INFO_URL STORAGE_PATH MODE
+            export E2E_LOGIN
 
             envsubst < docker/docker-compose.yml > docker/docker-compose.resolved.yml
 
@@ -266,3 +270,5 @@ jobs:
           GOOGLE_USER_INFO_URL: ${{ vars.GOOGLE_USER_INFO_URL }}
           GH_USER_INFO_URL: ${{ vars.GH_USER_INFO_URL }}
           STORAGE_PATH: ${{ vars.STORAGE_PATH }}
+          E2E_LOGIN: ${{ vars.E2E_LOGIN }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}

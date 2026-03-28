@@ -64,6 +64,9 @@ secrets:
   ADMIN_TOKEN_FILE:
     external: true
     name: ADMIN_TOKEN_FILE_${TAG}
+  E2E_PASSWORD_FILE:
+    external: true
+    name: E2E_PASSWORD_FILE_${TAG}
 
 services:
   db:
@@ -183,6 +186,8 @@ services:
       POSTGRES_PORT_FILE: /run/secrets/POSTGRES_PORT_FILE
       POSTGRES_DB_NAME_FILE: /run/secrets/POSTGRES_DB_NAME_FILE
       POSTGRES_SSLMODE_FILE: /run/secrets/POSTGRES_SSLMODE_FILE
+      E2E_LOGIN: "${E2E_LOGIN}"
+      E2E_PASSWORD_FILE: /run/secrets/E2E_PASSWORD_FILE
     secrets:
       - POSTGRES_DB_NAME_FILE
       - DEEPGRAM_API_KEY_FILE
@@ -199,6 +204,7 @@ services:
       - GOOGLE_CLIENT_ID_FILE
       - GOOGLE_CLIENT_SECRET_FILE
       - ADMIN_TOKEN_FILE
+      - E2E_PASSWORD_FILE
     volumes:
       - app_state:/app/data
     networks:
