@@ -281,7 +281,6 @@ func main() {
 
 	cfg := newConfig()
 	pool := models.Pool{Pool: newPool(context.Background(), logger)}
-	fmt.Println(cfg)
 	newE2ETestUser(&cfg, pool.Pool, logger)
 	internal.NewRouter(&cfg, &pool, logger, atom)
 }
