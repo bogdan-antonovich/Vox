@@ -92,6 +92,21 @@ var User UserForTests = UserForTests{
 	ProviderID:     -1,
 	UserProviderID: "google-123",
 }
+
+type FileForTests struct {
+	ID   string
+	Path string
+	Type string
+	Text string
+}
+
+var File FileForTests = FileForTests{
+	ID:   "file_123",
+	Path: "/path/to/file",
+	Type: "audio/mpeg",
+	Text: "file text",
+}
+
 var Hash []byte = []byte("somehashedbytes")
 var RefreshToken = "somerefreshtoken"
 var PasswordHash []byte = []byte("somepasswordhash")

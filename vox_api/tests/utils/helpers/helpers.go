@@ -383,14 +383,15 @@ func NewPublishRouterNoHub(t *testing.T, api *hub.HubAPI, userID string) *gin.En
 	r.Use(InjectLogger(zaptest.NewLogger(t)))
 	r.Use(func(ctx *gin.Context) {
 		ctx.Set("user_id", userID)
+		ctx.Set("host_and_hub_cache", hub.NewHostAndHubs())
 		ctx.Next()
 	})
 	r.POST("/hub/:hub_id/publish", api.PublishHandler)
 	return r
 }
 
-func PublishRequest(hubID string) *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/hub/"+hubID+"/publish", nil)
+func PublishRequest(hubID, fileID string) *http.Request {
+	return httptest.NewRequest(http.MethodPost, "/hub/"+hubID+"/publish?file_id="+fileID, nil)
 }
 
 func WriteTempFile(t *testing.T, content []byte) string {
@@ -511,7 +512,7 @@ func NewMockFishAudioServer(t *testing.T, audioChunk []byte) *httptest.Server {
 	return srv
 }
 
-func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID string, fishBuilder hub.FishBuilder) *gin.Engine {
+func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID string, cache *hub.HostAndHubs, fishBuilder hub.FishBuilder) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -520,6 +521,8 @@ func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID stri
 	r.Use(func(ctx *gin.Context) {
 		ctx.Set("user_id", userID)
 		ctx.Set("fish_builder", fishBuilder)
+		cache.AddHub(userID, h.ID)
+		ctx.Set("host_and_hub_cache", cache)
 		ctx.Next()
 	})
 	r.POST("/hub/:hub_id/publish", api.PublishHandler)
@@ -535,18 +538,26 @@ func NewConsumer(h *hub.Hub) (*hub.Consumer, <-chan []byte) {
 	return c, c.Send
 }
 
-func HappyHubDB(filename, text string) *mocks.HubDB {
+func HappyHubDB(path, filetype, text string) *mocks.HubDB {
 	return &mocks.HubDB{
-		GetReferenceF: func(_ context.Context, _ *zap.Logger, _ string) (string, string, error) {
-			return filename, text, nil
+		GetReferenceF: func(_ context.Context, _ *zap.Logger, _, _ string) (string, string, string, error) {
+			return path, filetype, text, nil
+		},
+	}
+}
+
+func NotOwnerHubDB() *mocks.HubDB {
+	return &mocks.HubDB{
+		GetReferenceF: func(_ context.Context, _ *zap.Logger, _, _ string) (string, string, string, error) {
+			return "", "", "", hub.ErrNotOwner
 		},
 	}
 }
 
 func ErrorHubDB() *mocks.HubDB {
 	return &mocks.HubDB{
-		GetReferenceF: func(_ context.Context, _ *zap.Logger, _ string) (string, string, error) {
-			return "", "", errors.New("db error")
+		GetReferenceF: func(_ context.Context, _ *zap.Logger, _, _ string) (string, string, string, error) {
+			return "", "", "", errors.New("db error")
 		},
 	}
 }
@@ -659,11 +670,6 @@ func InsertPasswordHash(t *testing.T, userID string, passwordHash []byte, db *pg
 	require.NoError(t, err)
 }
 
-func InsertVoiceRef(t *testing.T, userID string, filename string, text string, db *pgxpool.Pool) {
-	_, err := db.Exec(context.Background(), "INSERT INTO user_voice (user_id, filename, text) VALUES ($1, $2, $3)", userID, filename, text)
-	require.NoError(t, err)
-}
-
 func InsertAdditionalUserInfo(t *testing.T, user vars.UserForTests, db *pgxpool.Pool) {
 	_, err := db.Exec(context.Background(), "INSERT INTO users (id, email, name, picture_url) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET email = $2, name = $3, picture_url = $4", user.ID, user.Email, user.Name, user.Picture)
 	require.NoError(t, err)
@@ -675,7 +681,7 @@ func InsertFileMetadata(t *testing.T, fileID string, path string, typeof string,
 }
 
 func InsertFileAndUser(t *testing.T, userID string, fileID string, db *pgxpool.Pool) {
-	_, err := db.Exec(context.Background(), "INSERT INTO files_and_users (user_id, file_id) VALUES ($1, $2)", userID, fileID)
+	_, err := db.Exec(context.Background(), "INSERT INTO files_and_users (user_id, file_id, is_active) VALUES ($1, $2, true)", userID, fileID)
 	require.NoError(t, err)
 }
 

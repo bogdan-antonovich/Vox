@@ -89,7 +89,7 @@ func (v *PostgresVoice) GetVoiceReference(ctx context.Context, log *zap.Logger, 
 
 	defer helpers.CommitOrRollback(ctx, tx, err, log)
 
-	rows, err := tx.Query(ctx, "SELECT file_id FROM files_and_users WHERE user_id = $1", userID)
+	rows, err := tx.Query(ctx, "SELECT file_id FROM files_and_users WHERE user_id = $1 and is_active = TRUE", userID)
 	if err != nil {
 		log.Error("Failed to select from files_and_users", zap.Error(err))
 		return

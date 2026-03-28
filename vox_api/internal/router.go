@@ -129,15 +129,15 @@ func NewRouter(cfg *models.Config, pool *models.Pool, logger *zap.Logger, atom z
 	corsGroups.POST("/hub", timeout, authAPI.IsAuthorized, hubAPI.PutCache(hostAndHubs), hubAPI.NewHubHandler)
 	corsGroups.DELETE("/hub/:hub_id", timeout, authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.PutCache(hostAndHubs), hubAPI.DeleteHubHandler)
 	corsGroups.GET("/hub/:hub_id/listen", hubAPI.IsHubIDValid, hubAPI.ListenHandler)
-	corsGroups.GET("/hub/:hub_id/reconnect", timeout, authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.ReconnectHandler)
-	corsGroups.POST("/hub/:hub_id/publish", authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.IsContentTypeValid, hubAPI.FishSDK, hubAPI.PublishHandler)
+	corsGroups.GET("/hub/:hub_id/reconnect", timeout, authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.PutCache(hostAndHubs), hubAPI.ReconnectHandler)
+	corsGroups.POST("/hub/:hub_id/publish", authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.IsContentTypeValid, hubAPI.PutCache(hostAndHubs), hubAPI.FishSDK, hubAPI.PublishHandler)
 
 	corsGroups.GET("/user/info", timeout, authAPI.IsAuthorized, userAPI.InfoHandler)
 	corsGroups.GET("/user/hubs", timeout, authAPI.IsAuthorized, hubAPI.PutCache(hostAndHubs), userAPI.HubsHandler)
 	corsGroups.POST("/user/voice", authAPI.IsAuthorized, hubAPI.IsContentTypeValid, voiceAPI.NewReferenceHandler)
-	corsGroups.GET("/user/voice/meta", authAPI.IsAuthorized, voiceAPI.GetMetaReferenceHandler)
-	corsGroups.GET("/user/voice/file", authAPI.IsAuthorized, voiceAPI.GetMetaReferenceHandler)
-	corsGroups.DELETE("/user/voice", authAPI.IsAuthorized, voiceAPI.DeleteReferenceHandler)
+	corsGroups.GET("/user/voice/meta", timeout, authAPI.IsAuthorized, voiceAPI.GetMetaReferenceHandler)
+	corsGroups.GET("/user/voice/file", timeout, authAPI.IsAuthorized, voiceAPI.GetMetaReferenceHandler)
+	corsGroups.DELETE("/user/voice", timeout, authAPI.IsAuthorized, voiceAPI.DeleteReferenceHandler)
 
 	corsGroups.PUT("/admin/logs/level", timeout, authAPI.IsAdmin, logsAPI.LevelHandler)
 

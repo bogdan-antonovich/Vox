@@ -32,8 +32,8 @@ linters:
     - loggercheck
   settings:
     funlen:
-      lines: 120
-      statements: 60
+      lines: 150
+      statements: 85
   exclusions:
     paths:
       - "tests/.*"

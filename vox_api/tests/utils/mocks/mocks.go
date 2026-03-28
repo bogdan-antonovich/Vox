@@ -41,11 +41,11 @@ func (m *AuthDB) GetRefreshToken(ctx context.Context, log *zap.Logger, login str
 }
 
 type HubDB struct {
-	GetReferenceF func(ctx context.Context, log *zap.Logger, userID string) (string, string, error)
+	GetReferenceF func(ctx context.Context, log *zap.Logger, userID, fileID string) (path, filetype, text string, err error)
 }
 
-func (m *HubDB) GetReference(ctx context.Context, log *zap.Logger, userID string) (string, string, error) {
-	return m.GetReferenceF(ctx, log, userID)
+func (m *HubDB) GetReference(ctx context.Context, log *zap.Logger, userID, fileID string) (string, string, string, error) {
+	return m.GetReferenceF(ctx, log, userID, fileID)
 }
 
 type UserDB struct {

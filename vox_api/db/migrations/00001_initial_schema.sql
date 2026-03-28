@@ -42,14 +42,7 @@ CREATE TABLE files_and_users (
     PRIMARY KEY (file_id, user_id)
 );
 
-CREATE TABLE user_voice (
-    user_id  TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    filename TEXT NOT NULL,
-    text     TEXT NOT NULL
-);
-
 -- +goose Down
-DROP TABLE IF EXISTS user_voice;
 DROP TABLE IF EXISTS files_and_users;
 DROP TABLE IF EXISTS files;
 DROP TABLE IF EXISTS users_and_providers;

@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -302,8 +303,9 @@ func (h *HubAPI) FishSDK(ctx *gin.Context) {
 // @Description  Receives an audio stream, transcribes it via Deepgram, processes the transcription via Groq, and synthesizes speech via Fish Audio. All three operations run concurrently. Requires a valid user and hub in context.
 // @Tags         hub
 // @Accept       application/octet-stream
-// @Param        hub_id  path  string  true  "Hub ID"
-// @Param        lang    path  string  true  "Transcription language code (e.g. en, ru)"
+// @Param        hub_id  path  string   true  "Hub ID"
+// @Param        lang    query  string  true  "Transcription language code (e.g. en, ru)"
+// @Param        file_id query  string  true  "File ID to the voice reference"
 // @Success      200  "Audio stream processed successfully"
 // @Failure      401  {object}  models.HttpErrorResponse  "Missing or invalid auth cookies (IsAuthorized middleware)"
 // @Failure      404  {object}  models.HttpErrorResponse  "Invalid user ID or hub"
@@ -325,6 +327,13 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		return
 	}
 
+	val, ok := ctx.Get("host_and_hub_cache")
+	if !ok {
+		log.Error("Invalid host_and_hub_cache type")
+		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
+		return
+	}
+
 	hub, ok := isValHub(ctx, "hub")
 	if !ok {
 		log.Error("Hub is invalid", zap.Any("hub", hub))
@@ -332,13 +341,44 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		return
 	}
 
-	filename, text, err := h.DB.GetReference(ctx.Request.Context(), log, userID)
-	if err != nil {
+	isOwner := false
+	switch cache := val.(type) {
+	case *HostAndHubs:
+		for _, id := range cache.GetHubs(userID) {
+			if id == hub.ID {
+				isOwner = true
+				break
+			}
+		}
+		if !isOwner {
+			log.Debug("user is not the owner", zap.String("user_id", userID), zap.String("hub_id", hub.ID))
+			ctx.Data(http.StatusForbidden, mod.APP_JSON, mod.HttpError(mod.FORBIDDEN_CODE, mod.FORBIDDEN_MSG))
+			return
+		}
+	default:
+		log.Error("Invalid host_and_hub_cache type")
 		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
 		return
 	}
 
-	body, err := os.ReadFile(filename)
+	fileID := ctx.Query("file_id")
+	if fileID == "" {
+		log.Error("File ID is missing")
+		ctx.Data(http.StatusBadRequest, mod.APP_JSON, mod.HttpError(mod.INVALID_URL_CODE, mod.INVALID_URL_MSG))
+		return
+	}
+
+	path, _, text, err := h.DB.GetReference(ctx.Request.Context(), log, userID, fileID)
+	if err != nil {
+		if errors.Is(err, ErrNotOwner) {
+			ctx.Data(http.StatusForbidden, mod.APP_JSON, mod.HttpError(mod.FORBIDDEN_CODE, mod.FORBIDDEN_MSG))
+			return
+		}
+		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
+		return
+	}
+
+	body, err := os.ReadFile(path)
 	if err != nil {
 		log.Error("Failed to read file", zap.Error(err))
 		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
