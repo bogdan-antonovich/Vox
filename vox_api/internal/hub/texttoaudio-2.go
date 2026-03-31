@@ -54,7 +54,7 @@ func (f *OpenAI) Handle(ctx context.Context, s Stream) error {
 }
 
 func (f *OpenAI) NewStream(ctx context.Context) (s Stream, err error) {
-	response, err := f.client.Audio.Speech.New(ctx, openai.AudioSpeechNewParams{
+	response, err := f.client.Audio.Speech.New(ctx, openai.AudioSpeechNewParams{ //nolint:bodyclose
 		Model:          openai.SpeechModelTTS1,
 		Voice:          openai.AudioSpeechNewParamsVoiceAlloy,
 		Input:          f.text,
@@ -80,8 +80,15 @@ func (f *OpenAI) Do(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			f.Handle(ctx, s)
-			s.Close()
+
+			if err := f.Handle(ctx, s); err != nil {
+				_ = s.Close()
+				return err
+			}
+			if err := s.Close(); err != nil {
+				return err
+			}
+
 			if err := s.Err(); err != nil {
 				return err
 			}
