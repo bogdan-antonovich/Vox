@@ -58,7 +58,7 @@ func (f *OpenAI) NewStream(ctx context.Context) (s Stream, err error) {
 		Model:          openai.SpeechModelTTS1,
 		Voice:          openai.AudioSpeechNewParamsVoiceAlloy,
 		Input:          f.text,
-		ResponseFormat: openai.AudioSpeechNewParamsResponseFormatPCM,
+		ResponseFormat: openai.AudioSpeechNewParamsResponseFormatMP3,
 	})
 	if err != nil {
 		f.log.Error("Failed to stream TTS", zap.Error(err))
