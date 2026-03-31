@@ -75,27 +75,4 @@ func (g *Groq) do(ctx context.Context) (err error) {
 			return ctx.Err()
 		}
 	}
-
-	// for transcript := range g.transcription.Ch {
-	// 	select {
-	// 	case <-ctx.Done():
-	// 		return ctx.Err()
-	// 	default:
-	// 	}
-	// 	stream := client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
-	// 		Model: g.Model,
-	// 		Messages: []openai.ChatCompletionMessageParamUnion{
-	// 			openai.UserMessage(transcript),
-	// 		},
-	// 	})
-
-	// 	if err = g.handleStream(ctx, stream); err != nil {
-	// 		return err
-	// 	}
-
-	// 	if err = stream.Err(); err != nil && err != io.EOF {
-	// 		g.log.Error("Groq stream error", zap.Error(err))
-	// 		return err
-	// 	}
-	// }
 }

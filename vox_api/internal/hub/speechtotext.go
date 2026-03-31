@@ -69,7 +69,10 @@ func (d *Deepgram) Error(er *msginterfaces.ErrorResponse) error {
 		d.log.Error("Deepgram error", zap.String("err", "Unknown error"))
 		err = errors.New("unknown error")
 	}
-	d.errors.Ch <- err
+	select {
+	case d.errors.Ch <- err:
+	default:
+	}
 	return err
 }
 

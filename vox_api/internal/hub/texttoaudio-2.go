@@ -44,16 +44,16 @@ type OpenAI struct {
 }
 
 func (f *OpenAI) Handle(ctx context.Context, s Stream) error {
-	f.log.Debug("OpenAI.Handle started")
+	f.log.Debug("OpenAI.Handle", zap.Bool("ctx_is_nil", ctx == nil))
 	for s.Next() {
 		f.hub.Publish(s.Bytes())
 	}
-	f.log.Debug("OpenAI.Handle finished")
 
 	return nil
 }
 
 func (f *OpenAI) NewStream(ctx context.Context) (s Stream, err error) {
+	f.log.Debug("OpenAI.NewStream", zap.Bool("ctx_is_nil", ctx == nil))
 	response, err := f.client.Audio.Speech.New(ctx, openai.AudioSpeechNewParams{ //nolint:bodyclose
 		Model:          openai.SpeechModelTTS1,
 		Voice:          openai.AudioSpeechNewParamsVoiceAlloy,
@@ -69,10 +69,11 @@ func (f *OpenAI) NewStream(ctx context.Context) (s Stream, err error) {
 }
 
 func (f *OpenAI) Do(ctx context.Context) error {
-	f.log.Debug("OpenAI.Do")
+	f.log.Debug("OpenAI.Do", zap.Bool("ctx_is_nil", ctx == nil))
 	for {
 		select {
 		case <-ctx.Done():
+			f.log.Debug("Context is canceled")
 			return nil
 		case f.text = <-f.tokens.Ch:
 
