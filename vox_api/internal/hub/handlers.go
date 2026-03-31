@@ -1,10 +1,8 @@
 package hub
 
 import (
-	"errors"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"vox/pkg/helpers"
 	mod "vox/pkg/models"
@@ -379,22 +377,22 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		return
 	}
 
-	path, _, text, err := h.DB.GetReference(ctx.Request.Context(), log, userID, fileID)
-	if err != nil {
-		if errors.Is(err, ErrNotOwner) {
-			ctx.Data(http.StatusForbidden, mod.APP_JSON, mod.HttpError(mod.FORBIDDEN_CODE, mod.FORBIDDEN_MSG))
-			return
-		}
-		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
-		return
-	}
+	// path, _, text, err := h.DB.GetReference(ctx.Request.Context(), log, userID, fileID)
+	// if err != nil {
+	// 	if errors.Is(err, ErrNotOwner) {
+	// 		ctx.Data(http.StatusForbidden, mod.APP_JSON, mod.HttpError(mod.FORBIDDEN_CODE, mod.FORBIDDEN_MSG))
+	// 		return
+	// 	}
+	// 	ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
+	// 	return
+	// }
 
-	body, err := os.ReadFile(path)
-	if err != nil {
-		log.Error("Failed to read file", zap.Error(err))
-		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
-		return
-	}
+	// body, err := os.ReadFile(path)
+	// if err != nil {
+	// 	log.Error("Failed to read file", zap.Error(err))
+	// 	ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
+	// 	return
+	// }
 
 	var agent VoiceAgent
 	if builder, ok := ctx.Get("voice_agent_builder"); !ok {
