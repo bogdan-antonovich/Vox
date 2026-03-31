@@ -98,6 +98,13 @@ func (d *Deepgram) handleStream(rd io.Reader) error {
 	return nil
 }
 
+func (d *Deepgram) closer(pw *io.PipeWriter) {
+	err := pw.Close()
+	if err != nil {
+		d.log.Error("PipeWriter close error", zap.Error(err))
+	}
+}
+
 func (d *Deepgram) do(rd io.Reader) (err error) {
 	d.log.Debug("Deepgram.do", zap.Bool("ctx_is_nil", d.ctx == nil), zap.Bool("rd_is_nil", rd == nil))
 	d.client, err = client.NewWSUsingCallback(d.ctx, d.ApiKey, &interfaces.ClientOptions{Host: d.BaseURL}, &d.Options, d)
@@ -112,7 +119,7 @@ func (d *Deepgram) do(rd io.Reader) (err error) {
 
 	pr, pw := io.Pipe()
 	go func() {
-		defer pw.Close()
+		defer d.closer(pw)
 		buf := make([]byte, 4096)
 		for {
 			select {
@@ -121,7 +128,11 @@ func (d *Deepgram) do(rd io.Reader) (err error) {
 			default:
 				n, err := rd.Read(buf)
 				if n > 0 {
-					pw.Write(buf[:n])
+					_, err = pw.Write(buf[:n])
+					if err != nil {
+						d.log.Error("PipeWriter write error", zap.Error(err))
+						return
+					}
 				}
 				if err != nil {
 					return
