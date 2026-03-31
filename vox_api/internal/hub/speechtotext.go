@@ -88,7 +88,7 @@ func (d *Deepgram) UnhandledEvent(byData []byte) error                          
 func (d *Deepgram) handleStream(rd io.Reader) error {
 	d.log.Debug("Deepgram.handleStream", zap.Bool("rd_is_nil", rd == nil))
 	err := d.client.Stream(rd)
-	if !errors.Is(err, io.EOF) {
+	if err != nil && !errors.Is(err, io.EOF) {
 		d.log.Error("Deepgram stream ends with an error", zap.Error(err))
 		return err
 	}
