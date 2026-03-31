@@ -402,7 +402,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 	} else {
 		switch bldr := builder.(type) {
 		case VoiceAgentBuilder:
-			bldr.SetReference(body, text)
+			// bldr.SetReference(body, text)
 			bldr.SetHub(hub)
 			bldr.SetTokens(tokens)
 			bldr.SetLogger(log)
