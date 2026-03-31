@@ -231,6 +231,7 @@ services:
       - GOOGLE_CLIENT_SECRET_FILE
       - ADMIN_TOKEN_FILE
       - E2E_PASSWORD_FILE
+      - OPENAI_API_KEY_FILE
     volumes:
       - app_state:/app/data
     networks:
