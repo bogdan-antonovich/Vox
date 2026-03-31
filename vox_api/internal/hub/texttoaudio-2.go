@@ -82,6 +82,7 @@ func (f *OpenAI) Do(ctx context.Context) error {
 				return err
 			}
 
+			f.log.Debug("OpenAI.Do got stream, calling Handle")
 			if err := f.Handle(ctx, s); err != nil {
 				_ = s.Close()
 				return err
@@ -91,6 +92,7 @@ func (f *OpenAI) Do(ctx context.Context) error {
 			}
 
 			if err := s.Err(); err != nil {
+				f.log.Error("OpenAI stream error", zap.Error(err))
 				return err
 			}
 		}
