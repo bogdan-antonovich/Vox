@@ -100,7 +100,6 @@ func (d *Deepgram) handleStream(rd io.Reader) error {
 
 func (d *Deepgram) do(rd io.Reader) (err error) {
 	d.log.Debug("Deepgram.do", zap.Bool("ctx_is_nil", d.ctx == nil), zap.Bool("rd_is_nil", rd == nil))
-
 	d.client, err = client.NewWSUsingCallback(d.ctx, d.ApiKey, &interfaces.ClientOptions{Host: d.BaseURL}, &d.Options, d)
 	if err != nil {
 		d.log.Error("Deepgram connection error", zap.Error(err))
@@ -111,14 +110,32 @@ func (d *Deepgram) do(rd io.Reader) (err error) {
 		return errors.New("deepgram connection timed out")
 	}
 
-	if err = d.handleStream(rd); err != nil {
+	pr, pw := io.Pipe()
+	go func() {
+		defer pw.Close()
+		buf := make([]byte, 4096)
+		for {
+			select {
+			case <-d.ctx.Done():
+				return
+			default:
+				n, err := rd.Read(buf)
+				if n > 0 {
+					pw.Write(buf[:n])
+				}
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	if err = d.handleStream(pr); err != nil {
 		return err
 	}
-
 	select {
 	case err = <-d.errors.Ch:
 	default:
 	}
-
 	return err
 }
