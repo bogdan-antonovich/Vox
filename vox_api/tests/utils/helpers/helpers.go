@@ -512,7 +512,7 @@ func NewMockFishAudioServer(t *testing.T, audioChunk []byte) *httptest.Server {
 	return srv
 }
 
-func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID string, cache *hub.HostAndHubs, fishBuilder hub.FishBuilder) *gin.Engine {
+func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID string, cache *hub.HostAndHubs, VABuilder hub.VoiceAgentBuilder) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -520,7 +520,7 @@ func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID stri
 	r.Use(InjectHub(h))
 	r.Use(func(ctx *gin.Context) {
 		ctx.Set("user_id", userID)
-		ctx.Set("fish_builder", fishBuilder)
+		ctx.Set("voice_agent_builder", VABuilder)
 		cache.AddHub(userID, h.ID)
 		ctx.Set("host_and_hub_cache", cache)
 		ctx.Next()

@@ -8,7 +8,6 @@ import (
 	"vox/internal/user"
 	"vox/internal/user/voice"
 
-	fishaudio "github.com/fishaudio/fish-audio-go"
 	"go.uber.org/zap"
 )
 
@@ -74,36 +73,60 @@ func (m *VoiceDB) DeleteVoiceReference(ctx context.Context, log *zap.Logger, use
 	return m.DeleteVoiceReferenceF(ctx, log, userID, fileID)
 }
 
-type MockFishBuilder struct {
+// type MockFishBuilder struct {
+// 	tokens *hub.StringChan
+// 	hub    *hub.Hub
+// 	DoFunc func(ctx context.Context) error
+// }
+
+// func (m *MockFishBuilder) SetReference(audio []byte, text string) {}
+// func (m *MockFishBuilder) SetHub(h *hub.Hub) {
+// 	m.hub = h
+// }
+
+// func (m *MockFishBuilder) SetTokens(tokens *hub.StringChan) {
+// 	m.tokens = tokens
+// }
+// func (m *MockFishBuilder) SetLogger(log *zap.Logger) {}
+// func (m *MockFishBuilder) Get() hub.FishAudio {
+// 	return &MockFishAudio{tokens: m.tokens, hub: m.hub, DoFunc: m.DoFunc}
+// }
+
+// type MockFishAudio struct {
+// 	tokens *hub.StringChan
+// 	hub    *hub.Hub
+// 	DoFunc func(ctx context.Context) error
+// }
+
+// func (m *MockFishAudio) StreamWebSocket(ctx context.Context, textChan <-chan string, params *fishaudio.StreamParams, opts *fishaudio.WebSocketOptions) (hub.FishStream, error) {
+// 	return nil, nil
+// }
+// func (m *MockFishAudio) HandleStream(stream hub.FishStream) {}
+// func (m *MockFishAudio) Do(ctx context.Context) error {
+// 	for range m.tokens.Ch {
+// 	}
+// 	if m.hub != nil {
+// 		m.hub.Publish([]byte("fish-audio-bytes"))
+// 	}
+// 	return m.DoFunc(ctx)
+// }
+
+// func HappyFishBuilder() *MockFishBuilder {
+// 	return &MockFishBuilder{
+// 		DoFunc: func(ctx context.Context) error { return nil },
+// 	}
+// }
+//
+
+type MockVoiceAgent struct {
 	tokens *hub.StringChan
 	hub    *hub.Hub
 	DoFunc func(ctx context.Context) error
 }
 
-func (m *MockFishBuilder) SetReference(audio []byte, text string) {}
-func (m *MockFishBuilder) SetHub(h *hub.Hub) {
-	m.hub = h
-}
-
-func (m *MockFishBuilder) SetTokens(tokens *hub.StringChan) {
-	m.tokens = tokens
-}
-func (m *MockFishBuilder) SetLogger(log *zap.Logger) {}
-func (m *MockFishBuilder) Get() hub.FishAudio {
-	return &MockFishAudio{tokens: m.tokens, hub: m.hub, DoFunc: m.DoFunc}
-}
-
-type MockFishAudio struct {
-	tokens *hub.StringChan
-	hub    *hub.Hub
-	DoFunc func(ctx context.Context) error
-}
-
-func (m *MockFishAudio) StreamWebSocket(ctx context.Context, textChan <-chan string, params *fishaudio.StreamParams, opts *fishaudio.WebSocketOptions) (hub.FishStream, error) {
-	return nil, nil
-}
-func (m *MockFishAudio) HandleStream(stream hub.FishStream) {}
-func (m *MockFishAudio) Do(ctx context.Context) error {
+func (m *MockVoiceAgent) NewStream(ctx context.Context) (hub.Stream, error)   { return nil, nil }
+func (m *MockVoiceAgent) Handle(ctx context.Context, stream hub.Stream) error { return nil }
+func (m *MockVoiceAgent) Do(ctx context.Context) error {
 	for range m.tokens.Ch {
 	}
 	if m.hub != nil {
@@ -112,16 +135,43 @@ func (m *MockFishAudio) Do(ctx context.Context) error {
 	return m.DoFunc(ctx)
 }
 
-func HappyFishBuilder() *MockFishBuilder {
-	return &MockFishBuilder{
+type MockVoiceAgentBuilder struct {
+	tokens *hub.StringChan
+	hub    *hub.Hub
+	DoFunc func(ctx context.Context) error
+}
+
+func (m *MockVoiceAgentBuilder) SetReference(audio []byte, text string) {}
+func (m *MockVoiceAgentBuilder) SetHub(h *hub.Hub) {
+	m.hub = h
+}
+
+func (m *MockVoiceAgentBuilder) SetTokens(tokens *hub.StringChan) {
+	m.tokens = tokens
+}
+func (m *MockVoiceAgentBuilder) SetLogger(log *zap.Logger) {}
+func (m *MockVoiceAgentBuilder) Get() hub.VoiceAgent {
+	return &MockVoiceAgent{tokens: m.tokens, hub: m.hub, DoFunc: m.DoFunc}
+}
+
+func HappyVoiceAgentBuilder() *MockVoiceAgentBuilder {
+	return &MockVoiceAgentBuilder{
 		DoFunc: func(ctx context.Context) error { return nil },
 	}
 }
 
-func ErrorFishBuilder() *MockFishBuilder {
-	return &MockFishBuilder{
+func ErrorVoiceAgentBuilder() *MockVoiceAgentBuilder {
+	return &MockVoiceAgentBuilder{
 		DoFunc: func(ctx context.Context) error {
-			return errors.New("fish error")
+			return errors.New("voice agent error")
 		},
 	}
 }
+
+// func ErrorFishBuilder() *MockFishBuilder {
+// 	return &MockFishBuilder{
+// 		DoFunc: func(ctx context.Context) error {
+// 			return errors.New("fish error")
+// 		},
+// 	}
+// }

@@ -94,7 +94,9 @@ jobs:
             GH_USER_INFO_URL,
             STORAGE_PATH,
             E2E_LOGIN,
-            E2E_PASSWORD
+            E2E_PASSWORD,
+            OPENAI_API_KEY,
+            OPENAI_BASE_URL
           script: |
             set -euo pipefail
 
@@ -139,6 +141,7 @@ jobs:
             sync_secret "GOOGLE_CLIENT_SECRET_FILE" "$GOOGLE_CLIENT_SECRET"
             sync_secret "ADMIN_TOKEN_FILE"          "$ADMIN_TOKEN"
             sync_secret "E2E_PASSWORD_FILE"         "$E2E_PASSWORD"
+            sync_secret "OPENAI_API_KEY_FILE"       "$OPENAI_API_KEY"
 
             sync_config "loki_config" ~/vox_api/cfg/loki-config.yml
 
@@ -151,7 +154,7 @@ jobs:
             export FISH_AUDIO_BASE_URL DEEPGRAM_BASE_URL DEEPGRAM_MODEL
             export GOOGLE_TOKEN_URL GH_TOKEN_URL
             export GOOGLE_USER_INFO_URL GH_USER_INFO_URL STORAGE_PATH MODE
-            export E2E_LOGIN
+            export E2E_LOGIN, OPENAI_BASE_URL
 
             envsubst < docker/docker-compose.yml > docker/docker-compose.resolved.yml
 
@@ -221,7 +224,7 @@ jobs:
 
             echo "Cleaning up old secrets..."
             docker secret ls --format '{{.Name}}' \
-              | grep -E '^(JWT_SECRET_FILE|POSTGRES_USER_FILE|POSTGRES_PASSWORD_FILE|POSTGRES_HOST_FILE|POSTGRES_PORT_FILE|POSTGRES_SSLMODE_FILE|POSTGRES_DB_NAME_FILE|GRAFANA_PASSWORD_FILE|DEEPGRAM_API_KEY_FILE|GROQ_API_KEY_FILE|FISH_AUDIO_API_KEY_FILE|GH_CLIENT_ID_FILE|GH_CLIENT_SECRET_FILE|GOOGLE_CLIENT_ID_FILE|GOOGLE_CLIENT_SECRET_FILE|ADMIN_TOKEN_FILE)_[a-f0-9]{8}$' \
+              | grep -E '^(JWT_SECRET_FILE|POSTGRES_USER_FILE|POSTGRES_PASSWORD_FILE|POSTGRES_HOST_FILE|POSTGRES_PORT_FILE|POSTGRES_SSLMODE_FILE|POSTGRES_DB_NAME_FILE|GRAFANA_PASSWORD_FILE|DEEPGRAM_API_KEY_FILE|GROQ_API_KEY_FILE|FISH_AUDIO_API_KEY_FILE|GH_CLIENT_ID_FILE|GH_CLIENT_SECRET_FILE|GOOGLE_CLIENT_ID_FILE|GOOGLE_CLIENT_SECRET_FILE|ADMIN_TOKEN_FILE|E2E_PASSWORD_FILE|OPENAI_API_KEY_FILE)_[a-f0-9]{8}$' \
               | grep -v "_${TAG}$" \
               | xargs -r docker secret rm \
               || true
@@ -272,3 +275,5 @@ jobs:
           STORAGE_PATH: ${{ vars.STORAGE_PATH }}
           E2E_LOGIN: ${{ vars.E2E_LOGIN }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}

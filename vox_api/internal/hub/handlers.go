@@ -13,6 +13,8 @@ import (
 	fishaudio "github.com/fishaudio/fish-audio-go"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -290,11 +292,20 @@ func closeReader(rd io.ReadCloser, log *zap.Logger) {
 }
 
 func (h *HubAPI) FishSDK(ctx *gin.Context) {
-	ctx.Set("fish_builder", &BuildHolder{
+	ctx.Set("voice_agent_builder", &BuildHolder{
 		client: fishaudio.NewClient(
 			fishaudio.WithAPIKey(h.Cfg.FishAudioAPIKey),
 			fishaudio.WithBaseURL(h.Cfg.FishAudioBaseURL),
 		).TTS,
+	})
+}
+
+func (h *HubAPI) OpenAISDK(ctx *gin.Context) {
+	ctx.Set("voice_agent_builder", &OpenAIBuilder{
+		client: openai.NewClient(
+			option.WithAPIKey(h.Cfg.OpenAIAPIKey),
+			option.WithBaseURL(h.Cfg.OpenAIBaseURL),
+		),
 	})
 }
 
@@ -385,21 +396,21 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		return
 	}
 
-	var fish FishAudio
-	if fish_sdk, ok := ctx.Get("fish_builder"); !ok {
-		log.Error("fish_builder not found in context")
+	var agent VoiceAgent
+	if builder, ok := ctx.Get("voice_agent_builder"); !ok {
+		log.Error("voice_agent_builder not found in context")
 		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
 		return
 	} else {
-		switch fb := fish_sdk.(type) {
-		case FishBuilder:
-			fb.SetReference(body, text)
-			fb.SetHub(hub)
-			fb.SetTokens(tokens)
-			fb.SetLogger(log)
-			fish = fb.Get()
+		switch bldr := builder.(type) {
+		case VoiceAgentBuilder:
+			bldr.SetReference(body, text)
+			bldr.SetHub(hub)
+			bldr.SetTokens(tokens)
+			bldr.SetLogger(log)
+			agent = bldr.Get()
 		default:
-			log.Error("fish_builder is not a FishBuilder")
+			log.Error("voice_agent_builder is not a VoiceAgentBuilder")
 			ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
 			return
 		}
@@ -439,7 +450,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 
 	g.Go(func() error { return deepgram.do(ctx.Request.Body) })
 	g.Go(func() error { return groq.do(gctx) })
-	g.Go(func() error { return fish.Do(gctx) })
+	g.Go(func() error { return agent.Do(gctx) })
 
 	if err := g.Wait(); err != nil {
 		transcription.Close()

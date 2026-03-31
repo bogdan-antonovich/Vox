@@ -99,6 +99,8 @@ func newConfig() models.Config {
 		StoragePath:         getEnv("STORAGE_PATH"),
 		E2ETestUserLogin:    getEnv("E2E_LOGIN"),
 		E2ETestUserPassword: readFile(getEnv("E2E_PASSWORD_FILE")),
+		OpenAIAPIKey:        readFile(getEnv("OPENAI_API_KEY")),
+		OpenAIBaseURL:       getEnv("OPENAI_BASE_URL"),
 	}
 }
 

@@ -68,7 +68,7 @@ func TestPublishHandler_DBError_Returns500(t *testing.T) {
 	cache := hub.NewHostAndHubs()
 
 	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.ErrorHubDB()}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1234"))
@@ -82,7 +82,7 @@ func TestPublishHandler_DBError_ResponseBodyIsValidJSON(t *testing.T) {
 	cache := hub.NewHostAndHubs()
 
 	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.ErrorHubDB()}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1234"))
@@ -101,7 +101,7 @@ func TestPublishHandler_FileNotFound_Returns500(t *testing.T) {
 		Cfg: vars.PublishCfg(),
 		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
 	}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1234"))
@@ -119,7 +119,7 @@ func TestPublishHandler_FileNotFound_ResponseBodyIsValidJSON(t *testing.T) {
 		Cfg: vars.PublishCfg(),
 		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
 	}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1234"))
@@ -137,7 +137,7 @@ func TestPublishHandler_DBError_HubNotRemovedFromManager(t *testing.T) {
 	cache := hub.NewHostAndHubs()
 
 	api := &hub.HubAPI{MGR: mgr, Cfg: vars.PublishCfg(), DB: helpers.ErrorHubDB()}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
@@ -159,7 +159,7 @@ func TestPublishHandler_FileNotFound_HubNotRemovedFromManager(t *testing.T) {
 		Cfg: vars.PublishCfg(),
 		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
 	}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
@@ -181,7 +181,7 @@ func TestPublishHandler_HappyPath_Returns200(t *testing.T) {
 		Cfg: vars.CfgWithMocks(dgSrv, groqSrv, nil),
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -200,7 +200,7 @@ func TestPublishHandler_FishError_Returns500(t *testing.T) {
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.ErrorFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.ErrorVoiceAgentBuilder())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -255,7 +255,7 @@ func TestPublishHandler_InvalidFishBuilder_Returns500(t *testing.T) {
 	r.Use(func(ctx *gin.Context) {
 		uID := uuid.New().String()
 		ctx.Set("user_id", uID)
-		ctx.Set("fish_builder", "not-a-fish-builder")
+		ctx.Set("voice_agent_builder", "not-a-fish-builder")
 		c := hub.NewHostAndHubs()
 		c.AddHub(uID, hubID)
 		ctx.Set("host_and_hub_cache", c)
@@ -284,7 +284,7 @@ func TestPublishHandler_HappyPath_HubRemovedFromManagerAfterReturn(t *testing.T)
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
@@ -323,7 +323,7 @@ func TestPublishHandler_HappyPath_AudioChunkReachesHubConsumer(t *testing.T) {
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
@@ -358,7 +358,7 @@ func TestPublishHandler_DeepgramUnreachable_Returns500(t *testing.T) {
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
@@ -386,7 +386,7 @@ func TestPublishHandler_GroqUnreachable_Returns500(t *testing.T) {
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
@@ -410,7 +410,7 @@ func TestPublishHandler_FishAudioUnreachable_Returns500(t *testing.T) {
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.ErrorFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.ErrorVoiceAgentBuilder())
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
@@ -435,7 +435,7 @@ func TestPublishHandler_HappyPath_DoesNotPanic(t *testing.T) {
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
 	assert.NotPanics(t, func() {
 		w := httptest.NewRecorder()
@@ -454,7 +454,7 @@ func TestPublishHandler_UserNotOwner_Returns403(t *testing.T) {
 	r.Use(helpers.InjectHub(h))
 	r.Use(func(ctx *gin.Context) {
 		ctx.Set("user_id", uuid.New().String())
-		ctx.Set("fish_builder", mocks.HappyFishBuilder())
+		ctx.Set("voice_agent_builder", mocks.HappyVoiceAgentBuilder())
 		ctx.Set("host_and_hub_cache", cache)
 		ctx.Next()
 	})
@@ -490,7 +490,7 @@ func TestPublishHandler_MissingFileID_Returns400(t *testing.T) {
 	userID := uuid.New().String()
 	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.HappyHubDB("", "", "")}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, userID, cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, userID, cache, mocks.HappyVoiceAgentBuilder())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, ""))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -502,7 +502,7 @@ func TestPublishHandler_DBNotOwnerError_Returns403(t *testing.T) {
 	userID := uuid.New().String()
 	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.NotOwnerHubDB()}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, userID, cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, userID, cache, mocks.HappyVoiceAgentBuilder())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1235213"))
 	assert.Equal(t, http.StatusForbidden, w.Code)
@@ -514,7 +514,7 @@ func TestPublishHandler_DBNotOwnerError_ResponseBodyIsValidJSON(t *testing.T) {
 	userID := uuid.New().String()
 	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.NotOwnerHubDB()}
 	cache := hub.NewHostAndHubs()
-	r := helpers.NewPublishRouterFull(t, api, h, userID, cache, mocks.HappyFishBuilder())
+	r := helpers.NewPublishRouterFull(t, api, h, userID, cache, mocks.HappyVoiceAgentBuilder())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1235213"))
 	require.Equal(t, http.StatusForbidden, w.Code)

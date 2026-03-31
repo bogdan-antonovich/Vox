@@ -67,6 +67,9 @@ secrets:
   E2E_PASSWORD_FILE:
     external: true
     name: E2E_PASSWORD_FILE_${TAG}
+  OPENAI_API_KEY_FILE:
+    external: true
+    name: OPENAI_API_KEY_FILE_${TAG}
 
 services:
   traefik:
@@ -209,6 +212,8 @@ services:
       POSTGRES_SSLMODE_FILE: /run/secrets/POSTGRES_SSLMODE_FILE
       E2E_LOGIN: "${E2E_LOGIN}"
       E2E_PASSWORD_FILE: /run/secrets/E2E_PASSWORD_FILE
+      OPENAI_API_KEY_FILE: /run/secrets/OPENAI_API_KEY_FILE
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL}"
     secrets:
       - POSTGRES_DB_NAME_FILE
       - DEEPGRAM_API_KEY_FILE

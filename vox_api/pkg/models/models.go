@@ -61,6 +61,8 @@ type Config struct {
 	AdminToken          string
 	E2ETestUserLogin    string
 	E2ETestUserPassword string
+	OpenAIAPIKey        string
+	OpenAIBaseURL       string
 }
 
 type HttpErrorResponse struct {
