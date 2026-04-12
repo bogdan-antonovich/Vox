@@ -20,7 +20,8 @@ export function HostBroadcastPage() {
 
   const [copied, setCopied] = useState(false);
   const [voiceRefs, setVoiceRefs] = useState<VoiceReference[]>([]);
-  const [selectedFileId, setSelectedFileId] = useState<string>("");
+  const [selectedFileId, setSelectedFileId] =
+    useState<string>("just-something");
   const [isLoadingVoice, setIsLoadingVoice] = useState(true);
 
   const xhrRef = useRef<XMLHttpRequest | null>(null);
