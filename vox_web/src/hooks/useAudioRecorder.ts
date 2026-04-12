@@ -25,7 +25,6 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // Set up Web Audio API for visualization
       const audioCtx = new AudioContext();
       audioCtxRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
@@ -34,21 +33,35 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       source.connect(analyser);
       setAnalyserNode(analyser);
 
-      // Set up MediaRecorder for streaming
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "";
+      console.log("using mimeType:", mimeType || "browser default");
+
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
+        ...(mimeType && { mimeType }),
       });
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (e) => {
+        console.log("chunk:", e.data.size);
         if (e.data && e.data.size > 0) {
           onChunk(e.data);
         }
       };
 
+      mediaRecorder.onerror = (e) => {
+        console.error("MediaRecorder error:", e);
+      };
+
+      mediaRecorder.onstart = () => {
+        console.log("MediaRecorder started");
+      };
+
       mediaRecorder.start(CHUNK_INTERVAL_MS);
       setIsRecording(true);
     } catch (err) {
+      console.error("startRecording failed:", err);
       const message =
         err instanceof Error ? err.message : "Microphone access denied";
       setError(message);
