@@ -69,17 +69,11 @@ func (d *Deepgram) Error(er *msginterfaces.ErrorResponse) error {
 		d.log.Error("Deepgram error", zap.String("err", "Unknown error"))
 		err = errors.New("unknown error")
 	}
-	select {
-	case d.errors.Ch <- err:
-	default:
-	}
 	return err
 }
 
 func (d *Deepgram) Close(cr *msginterfaces.CloseResponse) error {
 	d.log.Debug("Deepgram.Close", zap.Any("cr", cr))
-	defer d.transcription.Close()
-	defer d.errors.Close()
 	return nil
 }
 
@@ -107,46 +101,48 @@ func (d *Deepgram) closer(pw *io.PipeWriter) {
 
 func (d *Deepgram) do(rd io.Reader) (err error) {
 	d.log.Debug("Deepgram.do", zap.Bool("ctx_is_nil", d.ctx == nil), zap.Bool("rd_is_nil", rd == nil))
-	d.client, err = client.NewWSUsingCallback(d.ctx, d.ApiKey, &interfaces.ClientOptions{Host: d.BaseURL}, &d.Options, d)
-	if err != nil {
-		d.log.Error("Deepgram connection error", zap.Error(err))
-		return err
-	}
-	if !d.client.Connect() {
-		d.log.Error("Deepgram connection timed out")
-		return errors.New("deepgram connection timed out")
-	}
+	select {
+	case <-d.ctx.Done():
+		return d.ctx.Err()
+	default:
 
-	pr, pw := io.Pipe()
-	go func() {
-		defer d.closer(pw)
-		buf := make([]byte, 4096)
-		for {
-			select {
-			case <-d.ctx.Done():
-				return
-			default:
-				n, err := rd.Read(buf)
-				if n > 0 {
-					_, err = pw.Write(buf[:n])
+		d.client, err = client.NewWSUsingCallback(d.ctx, d.ApiKey, &interfaces.ClientOptions{Host: d.BaseURL}, &d.Options, d)
+		if err != nil {
+			d.log.Error("Deepgram connection error", zap.Error(err))
+			return err
+		}
+		if !d.client.Connect() {
+			d.log.Error("Deepgram connection timed out")
+			return errors.New("deepgram connection timed out")
+		}
+
+		pr, pw := io.Pipe()
+		go func() {
+			defer d.closer(pw)
+			buf := make([]byte, 4096)
+			for {
+				select {
+				case <-d.ctx.Done():
+					return
+				default:
+					n, err := rd.Read(buf)
+					if n > 0 {
+						_, err = pw.Write(buf[:n])
+						if err != nil {
+							d.log.Error("PipeWriter write error", zap.Error(err))
+							return
+						}
+					}
 					if err != nil {
-						d.log.Error("PipeWriter write error", zap.Error(err))
 						return
 					}
 				}
-				if err != nil {
-					return
-				}
 			}
-		}
-	}()
+		}()
 
-	if err = d.handleStream(pr); err != nil {
-		return err
+		if err = d.handleStream(pr); err != nil {
+			return
+		}
 	}
-	select {
-	case err = <-d.errors.Ch:
-	default:
-	}
-	return err
+	return
 }

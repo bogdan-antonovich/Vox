@@ -45,7 +45,6 @@ func (g *Groq) do(ctx context.Context) (err error) {
 		option.WithAPIKey(g.ApiKey),
 		option.WithBaseURL(g.BaseURL),
 	)
-	defer g.tokens.Close()
 
 	for {
 		select {
