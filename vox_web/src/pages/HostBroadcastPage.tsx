@@ -40,19 +40,8 @@ export function HostBroadcastPage() {
 
   const publishChunk = useCallback(
     (chunk: Blob) => {
-      console.log(
-        "publishChunk called",
-        chunk.size,
-        "hubId:",
-        hubId,
-        "fileId:",
-        selectedFileId,
-      );
-      if (!hubId || !selectedFileId) {
-        console.warn("publishChunk bailed: missing hubId or selectedFileId");
-        return;
-      }
-      const url = hubApi.getPublishUrl(hubId, "ru", selectedFileId);
+      if (!hubId) return;
+      const url = hubApi.getPublishUrl(hubId, "ru", "just-something");
       console.log("sending to:", url);
       const xhr = new XMLHttpRequest();
       xhrRef.current = xhr;
@@ -64,7 +53,7 @@ export function HostBroadcastPage() {
       xhr.onerror = () => console.error("xhr error");
       xhr.send(chunk);
     },
-    [hubId, selectedFileId],
+    [hubId],
   );
 
   const handleStart = async () => {
