@@ -48,10 +48,10 @@ export const hubApi = {
   reconnect: (hubId: string) => apiClient.get(`/hub/${hubId}/reconnect`),
 
   getListenUrl: (hubId: string) =>
-    `https://bogdanantonovich.com/vox/api/hub/${hubId}/listen`,
+    `${apiClient.defaults.baseURL}/hub/${hubId}/listen`,
 
   getPublishUrl: (hubId: string, lang: string = "ru", fileId: string) =>
-    `https://bogdanantonovich.com/vox/api/hub/${hubId}/publish?lang=${lang}&file_id=${fileId}`,
+    `${apiClient.defaults.baseURL}/hub/${hubId}/publish?lang=${lang}&file_id=${fileId}`,
 };
 
 // ─── Voice ───────────────────────────────────────────────────────────────────

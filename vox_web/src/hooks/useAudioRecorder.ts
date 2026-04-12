@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from "react";
 
 interface UseAudioRecorderReturn {
   isRecording: boolean;
@@ -36,7 +36,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
       // Set up MediaRecorder for streaming
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
+        mimeType: "audio/webm;codecs=opus",
       });
       mediaRecorderRef.current = mediaRecorder;
 
@@ -50,7 +50,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       setIsRecording(true);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'Microphone access denied';
+        err instanceof Error ? err.message : "Microphone access denied";
       setError(message);
     }
   }, []);
