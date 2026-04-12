@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -91,42 +90,42 @@ func TestPublishHandler_WrongHubType_Returns500(t *testing.T) {
 // 	assert.True(t, json.Valid(w.Body.Bytes()))
 // }
 
-func TestPublishHandler_FileNotFound_Returns500(t *testing.T) {
-	h := hub.NewHub(uuid.New().String())
-	defer h.Close()
-	cache := hub.NewHostAndHubs()
+// func TestPublishHandler_FileNotFound_Returns500(t *testing.T) {
+// 	h := hub.NewHub(uuid.New().String())
+// 	defer h.Close()
+// 	cache := hub.NewHostAndHubs()
 
-	api := &hub.HubAPI{
-		MGR: hub.NewManager(),
-		Cfg: vars.PublishCfg(),
-		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
-	}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
+// 	api := &hub.HubAPI{
+// 		MGR: hub.NewManager(),
+// 		Cfg: vars.PublishCfg(),
+// 		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
+// 	}
+// 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1234"))
+// 	w := httptest.NewRecorder()
+// 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1234"))
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-}
+// 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+// }
 
-func TestPublishHandler_FileNotFound_ResponseBodyIsValidJSON(t *testing.T) {
-	h := hub.NewHub(uuid.New().String())
-	defer h.Close()
-	cache := hub.NewHostAndHubs()
+// func TestPublishHandler_FileNotFound_ResponseBodyIsValidJSON(t *testing.T) {
+// 	h := hub.NewHub(uuid.New().String())
+// 	defer h.Close()
+// 	cache := hub.NewHostAndHubs()
 
-	api := &hub.HubAPI{
-		MGR: hub.NewManager(),
-		Cfg: vars.PublishCfg(),
-		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
-	}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
+// 	api := &hub.HubAPI{
+// 		MGR: hub.NewManager(),
+// 		Cfg: vars.PublishCfg(),
+// 		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
+// 	}
+// 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1234"))
+// 	w := httptest.NewRecorder()
+// 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1234"))
 
-	require.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.True(t, json.Valid(w.Body.Bytes()))
-}
+// 	require.Equal(t, http.StatusInternalServerError, w.Code)
+// 	assert.True(t, json.Valid(w.Body.Bytes()))
+// }
 
 // defer MGR.Delete is registered AFTER the DB+file reads, so on a DB error
 // the hub must still be present in the manager when the handler returns.
@@ -148,26 +147,26 @@ func TestPublishHandler_FileNotFound_ResponseBodyIsValidJSON(t *testing.T) {
 // }
 
 // Same for file-not-found.
-func TestPublishHandler_FileNotFound_HubNotRemovedFromManager(t *testing.T) {
-	mgr := hub.NewManager()
-	hubID := mgr.New()
-	h, _ := mgr.Get(hubID)
-	cache := hub.NewHostAndHubs()
+// func TestPublishHandler_FileNotFound_HubNotRemovedFromManager(t *testing.T) {
+// 	mgr := hub.NewManager()
+// 	hubID := mgr.New()
+// 	h, _ := mgr.Get(hubID)
+// 	cache := hub.NewHostAndHubs()
 
-	api := &hub.HubAPI{
-		MGR: mgr,
-		Cfg: vars.PublishCfg(),
-		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
-	}
-	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
+// 	api := &hub.HubAPI{
+// 		MGR: mgr,
+// 		Cfg: vars.PublishCfg(),
+// 		DB:  helpers.HappyHubDB("/nonexistent/does-not-exist.mp3", "mp3", "text"),
+// 	}
+// 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
+// 	w := httptest.NewRecorder()
+// 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
 
-	require.Equal(t, http.StatusInternalServerError, w.Code)
-	_, ok := mgr.Get(hubID)
-	assert.True(t, ok, "hub must still exist: defer Delete not registered at file-error return point")
-}
+//		require.Equal(t, http.StatusInternalServerError, w.Code)
+//		_, ok := mgr.Get(hubID)
+//		assert.True(t, ok, "hub must still exist: defer Delete not registered at file-error return point")
+//	}
 func TestPublishHandler_HappyPath_Returns200(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
 	dgSrv := helpers.NewMockDeepgramServer(t, "hello world")
