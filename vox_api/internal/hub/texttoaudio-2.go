@@ -52,8 +52,8 @@ func (f *OpenAI) Handle(ctx context.Context, s Stream) error {
 	return nil
 }
 
-// wtf
 func (f *OpenAI) NewStream(ctx context.Context) (s Stream, err error) {
+	// I dont care
 	f.log.Debug("OpenAI.NewStream", zap.Bool("ctx_is_nil", ctx == nil))
 	response, err := f.client.Audio.Speech.New(ctx, openai.AudioSpeechNewParams{ //nolint:bodyclose
 		Model:          openai.SpeechModelTTS1,
