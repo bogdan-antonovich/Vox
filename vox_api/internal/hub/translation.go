@@ -54,6 +54,7 @@ func (g *Groq) do(ctx context.Context) (err error) {
 			resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 				Model: g.Model,
 				Messages: []openai.ChatCompletionMessageParamUnion{
+					openai.SystemMessage("You are a translator. Translate the following text to English. Output only the translation, nothing else."),
 					openai.UserMessage(transcript),
 				},
 			})
