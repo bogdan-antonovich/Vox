@@ -21,6 +21,7 @@ type Deepgram struct {
 	errors        *ErrorChan
 	log           *zap.Logger
 	ctx           context.Context
+	done          chan struct{}
 }
 
 func (d *Deepgram) Open(or *msginterfaces.OpenResponse) error {
@@ -65,6 +66,10 @@ func (d *Deepgram) Error(er *msginterfaces.ErrorResponse) error {
 			zap.String("dg_variant", er.Variant),
 		)
 		err = errors.New(er.ErrMsg)
+		select {
+		case d.errors.Ch <- err:
+		default:
+		}
 	} else {
 		d.log.Error("Deepgram error", zap.String("err", "Unknown error"))
 		err = errors.New("unknown error")
@@ -74,6 +79,7 @@ func (d *Deepgram) Error(er *msginterfaces.ErrorResponse) error {
 
 func (d *Deepgram) Close(cr *msginterfaces.CloseResponse) error {
 	d.log.Debug("Deepgram.Close", zap.Any("cr", cr))
+	close(d.done)
 	return nil
 }
 
@@ -101,48 +107,52 @@ func (d *Deepgram) closer(pw *io.PipeWriter) {
 
 func (d *Deepgram) do(rd io.Reader) (err error) {
 	d.log.Debug("Deepgram.do", zap.Bool("ctx_is_nil", d.ctx == nil), zap.Bool("rd_is_nil", rd == nil))
-	select {
-	case <-d.ctx.Done():
-		return d.ctx.Err()
-	default:
 
-		d.client, err = client.NewWSUsingCallback(d.ctx, d.ApiKey, &interfaces.ClientOptions{Host: d.BaseURL}, &d.Options, d)
-		if err != nil {
-			d.log.Error("Deepgram connection error", zap.Error(err))
-			return err
-		}
-		if !d.client.Connect() {
-			d.log.Error("Deepgram connection timed out")
-			return errors.New("deepgram connection timed out")
-		}
+	d.done = make(chan struct{})
+	d.client, err = client.NewWSUsingCallback(d.ctx, d.ApiKey, &interfaces.ClientOptions{Host: d.BaseURL}, &d.Options, d)
+	if err != nil {
+		d.log.Error("Deepgram connection error", zap.Error(err))
+		return err
+	}
+	if !d.client.Connect() {
+		d.log.Error("Deepgram connection timed out")
+		return errors.New("deepgram connection timed out")
+	}
 
-		pr, pw := io.Pipe()
-		go func() {
-			defer d.closer(pw)
-			buf := make([]byte, 4096)
-			for {
-				select {
-				case <-d.ctx.Done():
-					return
-				default:
-					n, err := rd.Read(buf)
-					if n > 0 {
-						_, err = pw.Write(buf[:n])
-						if err != nil {
-							d.log.Error("PipeWriter write error", zap.Error(err))
-							return
-						}
-					}
+	pr, pw := io.Pipe()
+	go func() {
+		defer d.closer(pw)
+		buf := make([]byte, 4096)
+		for {
+			select {
+			case <-d.ctx.Done():
+				return
+			default:
+				n, err := rd.Read(buf)
+				if n > 0 {
+					_, err = pw.Write(buf[:n])
 					if err != nil {
+						d.log.Error("PipeWriter write error", zap.Error(err))
 						return
 					}
 				}
+				if err != nil {
+					return
+				}
 			}
-		}()
-
-		if err = d.handleStream(pr); err != nil {
-			return
 		}
+	}()
+
+	if err = d.handleStream(pr); err != nil {
+		return
 	}
-	return
+
+	select {
+	case err = <-d.errors.Ch:
+		return err
+	case <-d.done:
+		return nil
+	case <-d.ctx.Done():
+		return d.ctx.Err()
+	}
 }
