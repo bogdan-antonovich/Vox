@@ -42,8 +42,6 @@ func (d *Deepgram) Message(mr *msginterfaces.MessageResponse) error {
 				case <-d.ctx.Done():
 					return d.ctx.Err()
 				}
-			} else {
-				d.log.Warn("Deepgram transcript is empty", zap.Any("mr", mr))
 			}
 		} else {
 			d.log.Warn("Deepgram transcript holder is empty", zap.Any("mr", mr))

@@ -77,6 +77,7 @@ func (f *OpenAI) Do(ctx context.Context) error {
 			f.log.Debug("Context is canceled")
 			return nil
 		case f.text = <-f.tokens.Ch:
+			f.log.Debug("OpenAI.Do got text", zap.String("text", f.text))
 
 			s, err := f.NewStream(ctx)
 			if err != nil {
