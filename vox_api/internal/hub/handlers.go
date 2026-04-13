@@ -446,8 +446,8 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 	}
 	log.Debug("Audio publishing started", zap.String("user_id", userID), zap.String("hub_id", hub.ID))
 
-	g.Go(func() error { return deepgram.do(ctx.Request.Body) })
-	g.Go(func() error { return groq.do(gctx) })
+	g.Go(func() error { defer transcription.Close(); return deepgram.do(ctx.Request.Body) })
+	g.Go(func() error { defer tokens.Close(); return groq.do(gctx) })
 	g.Go(func() error { return agent.Do(gctx) })
 
 	if err := g.Wait(); err != nil {
