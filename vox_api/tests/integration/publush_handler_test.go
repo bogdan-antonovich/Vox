@@ -210,7 +210,7 @@ func TestPublishHandler_HappyPath(t *testing.T) {
 	}
 }
 
-func TestPublishHandler_FishError_Returns500(t *testing.T) {
+func TestPublishHandler_FishError(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
 	dgSrv := helpers.NewMockDeepgramServer(t, "hello world")
 	groqSrv := helpers.NewMockGroqServer(t, "processed token")
@@ -224,9 +224,20 @@ func TestPublishHandler_FishError_Returns500(t *testing.T) {
 	}
 	cache := hub.NewHostAndHubs()
 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.ErrorVoiceAgentBuilder())
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	srv := httptest.NewServer(r)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/hub/" + hubID + "/publish?lang=ru&file_id=12345"
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio"))
+	require.NoError(t, err)
+
+	// Server should close connection due to pipeline error
+	_, _, err = ws.ReadMessage()
+	assert.Error(t, err)
 }
 
 func TestPublishHandler_NoFishBuilder_Returns500(t *testing.T) {
@@ -292,15 +303,12 @@ func TestPublishHandler_InvalidFishBuilder_Returns500(t *testing.T) {
 
 func TestPublishHandler_HappyPath_HubRemovedFromManagerAfterReturn(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-
 	dgSrv := helpers.NewMockDeepgramServer(t, "hello world")
 	groqSrv := helpers.NewMockGroqServer(t, "token")
 	fishSrv := helpers.NewMockFishAudioServer(t, []byte("chunk"))
-
 	mgr := hub.NewManager()
 	hubID := mgr.New()
 	h, _ := mgr.Get(hubID)
-
 	api := &hub.HubAPI{
 		MGR: mgr,
 		Cfg: vars.CfgWithMocks(dgSrv, groqSrv, fishSrv),
@@ -309,10 +317,27 @@ func TestPublishHandler_HappyPath_HubRemovedFromManagerAfterReturn(t *testing.T)
 	cache := hub.NewHostAndHubs()
 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
+	srv := httptest.NewServer(r)
+	defer srv.Close()
 
-	require.Equal(t, http.StatusOK, w.Code)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/hub/" + hubID + "/publish?lang=ru&file_id=12345"
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio"))
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	require.NoError(t, err)
+
+	for {
+		_, _, err := ws.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+
 	_, ok := mgr.Get(hubID)
 	assert.True(t, ok, "defer MGR.Delete must have fired: hub must not be gone after handler returns")
 }
@@ -361,20 +386,15 @@ func TestPublishHandler_HappyPath_AudioChunkReachesHubConsumer(t *testing.T) {
 	}
 }
 
-func TestPublishHandler_DeepgramUnreachable_Returns500(t *testing.T) {
+func TestPublishHandler_DeepgramUnreachable(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-
-	// Start a server and close it immediately so the address is unreachable.
 	deadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	deadSrv.Close()
-
 	groqSrv := helpers.NewMockGroqServer(t, "token")
 	fishSrv := helpers.NewMockFishAudioServer(t, []byte("chunk"))
-
 	mgr := hub.NewManager()
 	hubID := mgr.New()
 	h, _ := mgr.Get(hubID)
-
 	api := &hub.HubAPI{
 		MGR: mgr,
 		Cfg: vars.CfgWithMocks(deadSrv, groqSrv, fishSrv),
@@ -383,26 +403,29 @@ func TestPublishHandler_DeepgramUnreachable_Returns500(t *testing.T) {
 	cache := hub.NewHostAndHubs()
 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
+	srv := httptest.NewServer(r)
+	defer srv.Close()
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/hub/" + hubID + "/publish?lang=ru&file_id=12345"
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio"))
+	require.NoError(t, err)
+
+	_, _, err = ws.ReadMessage()
+	assert.Error(t, err)
 }
 
-func TestPublishHandler_GroqUnreachable_Returns500(t *testing.T) {
+func TestPublishHandler_GroqUnreachable(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-
 	dgSrv := helpers.NewMockDeepgramServer(t, "hello world")
-
 	deadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	deadSrv.Close()
-
 	fishSrv := helpers.NewMockFishAudioServer(t, []byte("chunk"))
-
 	mgr := hub.NewManager()
 	hubID := mgr.New()
 	h, _ := mgr.Get(hubID)
-
 	api := &hub.HubAPI{
 		MGR: mgr,
 		Cfg: vars.CfgWithMocks(dgSrv, deadSrv, fishSrv),
@@ -411,22 +434,27 @@ func TestPublishHandler_GroqUnreachable_Returns500(t *testing.T) {
 	cache := hub.NewHostAndHubs()
 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
+	srv := httptest.NewServer(r)
+	defer srv.Close()
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/hub/" + hubID + "/publish?lang=ru&file_id=12345"
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio"))
+	require.NoError(t, err)
+
+	_, _, err = ws.ReadMessage()
+	assert.Error(t, err)
 }
 
-func TestPublishHandler_FishAudioUnreachable_Returns500(t *testing.T) {
+func TestPublishHandler_FishAudioUnreachable(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-
 	dgSrv := helpers.NewMockDeepgramServer(t, "hello world")
 	groqSrv := helpers.NewMockGroqServer(t, "token")
-
 	mgr := hub.NewManager()
 	hubID := mgr.New()
 	h, _ := mgr.Get(hubID)
-
 	api := &hub.HubAPI{
 		MGR: mgr,
 		Cfg: vars.CfgWithMocks(dgSrv, groqSrv, nil),
@@ -435,10 +463,18 @@ func TestPublishHandler_FishAudioUnreachable_Returns500(t *testing.T) {
 	cache := hub.NewHostAndHubs()
 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.ErrorVoiceAgentBuilder())
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
+	srv := httptest.NewServer(r)
+	defer srv.Close()
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/hub/" + hubID + "/publish?lang=ru&file_id=12345"
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio"))
+	require.NoError(t, err)
+
+	_, _, err = ws.ReadMessage()
+	assert.Error(t, err)
 }
 
 func TestPublishHandler_HappyPath_DoesNotPanic(t *testing.T) {
@@ -475,6 +511,7 @@ func TestPublishHandler_UserNotOwner_Returns403(t *testing.T) {
 	r := gin.New()
 	r.Use(helpers.InjectLogger(zaptest.NewLogger(t)))
 	r.Use(helpers.InjectHub(h))
+	r.Use(helpers.InjectWSUpgrader())
 	r.Use(func(ctx *gin.Context) {
 		ctx.Set("user_id", uuid.New().String())
 		ctx.Set("voice_agent_builder", mocks.HappyVoiceAgentBuilder())
