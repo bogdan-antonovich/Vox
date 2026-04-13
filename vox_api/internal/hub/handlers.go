@@ -274,8 +274,13 @@ func (h *HubAPI) ListenHandler(ctx *gin.Context) {
 				return false
 			}
 			_, err := w.Write(chunk)
-			return err == nil
-
+			if err != nil {
+				return false
+			}
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+			return true
 		case <-clientGone:
 			return false
 		}
