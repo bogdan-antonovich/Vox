@@ -59,11 +59,12 @@ func (h *Hub) run() {
 }
 
 func (r *Hub) Publish(chunk []byte) {
-	select {
-	case r.broadcast <- chunk:
-	default:
-		// broadcast buffer full, drop chunk
-	}
+	r.broadcast <- chunk
+	// select {
+	// case r.broadcast <- chunk:
+	// default:
+	// 	// broadcast buffer full, drop chunk
+	// }
 }
 
 func (r *Hub) AddConsumer(c *Consumer) {
