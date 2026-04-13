@@ -11,6 +11,7 @@ import (
 	fishaudio "github.com/fishaudio/fish-audio-go"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"go.uber.org/zap"
@@ -308,21 +309,26 @@ func (h *HubAPI) OpenAISDK(ctx *gin.Context) {
 }
 
 // PublishHandler godoc
-// @Summary      Publish audio stream
-// @Description  Receives an audio stream, transcribes it via Deepgram, processes the transcription via Groq, and synthesizes speech via Fish Audio. All three operations run concurrently. Requires a valid user and hub in context.
+// @Summary      Publish audio stream via WebSocket
+// @Description  Upgrades to WebSocket, receives audio chunks, transcribes via Deepgram, processes via Groq, and synthesizes speech. All operations run concurrently. Requires a valid user and hub in context.
 // @Tags         hub
-// @Accept       application/octet-stream
-// @Param        hub_id  path  string   true  "Hub ID"
+// @Param        hub_id  path   string  true  "Hub ID"
 // @Param        lang    query  string  true  "Transcription language code (e.g. en, ru)"
 // @Param        file_id query  string  true  "File ID to the voice reference"
-// @Success      200  "Audio stream processed successfully"
-// @Failure      401  {object}  models.HttpErrorResponse  "Missing or invalid auth cookies (IsAuthorized middleware)"
+// @Success      101  "WebSocket upgrade successful"
+// @Failure      401  {object}  models.HttpErrorResponse  "Missing or invalid auth cookies"
 // @Failure      404  {object}  models.HttpErrorResponse  "Invalid user ID or hub"
-// @Failure      415  {object}  models.HttpErrorResponse  "Invalid content type (IsContentTypeValid middleware)"
 // @Failure      500  {object}  models.HttpErrorResponse  "Internal server error"
 // @Security     CookieAuth
-// @Router       /hub/{hub_id}/publish [post]
+// @Router       /hub/{hub_id}/publish [get]
 func (h *HubAPI) PublishHandler(ctx *gin.Context) {
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			return origin == "https://bogdanantonovich.com" || origin == "https://www.bogdanantonovich.com"
+		},
+	}
+
 	log := mod.GetLogger(ctx)
 	transcription := NewStringChanBuf(1)
 	tokens := NewStringChanBuf(1)
@@ -377,23 +383,6 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		return
 	}
 
-	// path, _, text, err := h.DB.GetReference(ctx.Request.Context(), log, userID, fileID)
-	// if err != nil {
-	// 	if errors.Is(err, ErrNotOwner) {
-	// 		ctx.Data(http.StatusForbidden, mod.APP_JSON, mod.HttpError(mod.FORBIDDEN_CODE, mod.FORBIDDEN_MSG))
-	// 		return
-	// 	}
-	// 	ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
-	// 	return
-	// }
-
-	// body, err := os.ReadFile(path)
-	// if err != nil {
-	// 	log.Error("Failed to read file", zap.Error(err))
-	// 	ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
-	// 	return
-	// }
-
 	var agent VoiceAgent
 	if builder, ok := ctx.Get("voice_agent_builder"); !ok {
 		log.Error("voice_agent_builder not found in context")
@@ -402,7 +391,6 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 	} else {
 		switch bldr := builder.(type) {
 		case VoiceAgentBuilder:
-			// bldr.SetReference(body, text)
 			bldr.SetHub(hub)
 			bldr.SetTokens(tokens)
 			bldr.SetLogger(log)
@@ -414,7 +402,16 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		}
 	}
 
-	defer closeReader(ctx.Request.Body, log)
+	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	if err != nil {
+		log.Error("WebSocket upgrade failed", zap.Error(err))
+		return
+	}
+	defer conn.Close()
+
+	log.Debug("Audio publishing started", zap.String("user_id", userID), zap.String("hub_id", hub.ID))
+
+	pr, pw := io.Pipe()
 
 	g, gctx := errgroup.WithContext(ctx.Request.Context())
 
@@ -423,7 +420,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		BaseURL: h.Cfg.DeepgramBaseURL,
 		Options: interfaces.LiveTranscriptionOptions{
 			Model:       h.Cfg.DeepgramModel,
-			Language:    ctx.Param("lang"),
+			Language:    ctx.Query("lang"),
 			Channels:    1,
 			Endpointing: "true",
 			Numerals:    true,
@@ -444,9 +441,27 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		tokens:        tokens,
 		log:           log,
 	}
-	log.Debug("Audio publishing started", zap.String("user_id", userID), zap.String("hub_id", hub.ID))
 
-	g.Go(func() error { defer transcription.Close(); return deepgram.do(ctx.Request.Body) })
+	g.Go(func() error {
+		defer pw.Close()
+		for {
+			msgType, msg, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+					return nil
+				}
+				log.Error("WebSocket read error", zap.Error(err))
+				return err
+			}
+			if msgType == websocket.BinaryMessage {
+				if _, err := pw.Write(msg); err != nil {
+					return err
+				}
+			}
+		}
+	})
+
+	g.Go(func() error { defer transcription.Close(); return deepgram.do(pr) })
 	g.Go(func() error { defer tokens.Close(); return groq.do(gctx) })
 	g.Go(func() error { return agent.Do(gctx) })
 
@@ -455,10 +470,9 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		deepgramErrors.Close()
 		groqErrors.Close()
 		tokens.Close()
-		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
+		log.Error("Publishing pipeline error", zap.Error(err))
 		return
 	}
 
 	log.Debug("Audio publishing ended", zap.String("user_id", userID), zap.String("hub_id", hub.ID))
-	ctx.Status(http.StatusOK)
 }

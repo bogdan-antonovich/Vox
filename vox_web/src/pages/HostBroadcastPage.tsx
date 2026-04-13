@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
-import { hubApi } from "../api";
+// import { hubApi } from "../api";
 import { VoxLogo } from "../components/VoxLogo";
 import { Button } from "../components/Button";
 import { Waveform } from "../components/Waveform";
@@ -10,21 +10,17 @@ import type { VoiceReference } from "../types";
 import { voiceApi } from "../api";
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-
 export function HostBroadcastPage() {
   const { hubId } = useParams<{ hubId: string }>();
   const navigate = useNavigate();
-
   const { isRecording, analyserNode, startRecording, stopRecording, error } =
     useAudioRecorder();
-
   const [copied, setCopied] = useState(false);
   const [voiceRefs, setVoiceRefs] = useState<VoiceReference[]>([]);
   const [selectedFileId, setSelectedFileId] =
     useState<string>("just-something");
   const [isLoadingVoice, setIsLoadingVoice] = useState(true);
-
-  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const wsRef = useRef<WebSocket | null>(null); // <-- was xhrRef
 
   // Fetch voice samples on mount
   useEffect(() => {
@@ -32,37 +28,38 @@ export function HostBroadcastPage() {
       .getMeta()
       .then(({ data }) => {
         setVoiceRefs(data || []);
-        if (data?.length) setSelectedFileId(data[0].file_id); // auto-select first
+        if (data?.length) setSelectedFileId(data[0].file_id);
       })
       .catch(() => {})
       .finally(() => setIsLoadingVoice(false));
   }, []);
 
-  const publishChunk = useCallback(
-    (chunk: Blob) => {
-      if (!hubId) return;
-      const url = hubApi.getPublishUrl(hubId, "ru", "just-something");
-      console.log("sending to:", url);
-      const xhr = new XMLHttpRequest();
-      xhrRef.current = xhr;
-      xhr.open("POST", url, true);
-      xhr.withCredentials = true;
-      xhr.setRequestHeader("Content-Type", "application/octet-stream");
-      xhr.onload = () =>
-        console.log("xhr response:", xhr.status, xhr.responseText);
-      xhr.onerror = () => console.error("xhr error");
-      xhr.send(chunk);
-    },
-    [hubId],
-  );
+  // <-- removed publishChunk
 
   const handleStart = async () => {
-    await startRecording(publishChunk);
+    if (!hubId) return;
+    const ws = new WebSocket(
+      `wss://bogdanantonovich.com/vox/api/hub/${hubId}/publish?lang=ru&file_id=just-something`,
+    );
+    ws.binaryType = "arraybuffer";
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+      startRecording((chunk: Blob) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          chunk.arrayBuffer().then((buf) => ws.send(buf));
+        }
+      });
+    };
+    ws.onerror = (e) => console.error("WebSocket error:", e);
+    ws.onclose = () => console.log("WebSocket closed");
   };
 
   const handleStop = () => {
     stopRecording();
-    xhrRef.current?.abort();
+    wsRef.current?.close(); // <-- was xhrRef.current?.abort()
+    wsRef.current = null;
   };
 
   const handleCopyId = () => {
@@ -72,7 +69,6 @@ export function HostBroadcastPage() {
       setTimeout(() => setCopied(false), 1800);
     }
   };
-
   return (
     <div
       style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}

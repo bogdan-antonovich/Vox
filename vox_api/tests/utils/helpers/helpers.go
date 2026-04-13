@@ -386,12 +386,12 @@ func NewPublishRouterNoHub(t *testing.T, api *hub.HubAPI, userID string) *gin.En
 		ctx.Set("host_and_hub_cache", hub.NewHostAndHubs())
 		ctx.Next()
 	})
-	r.POST("/hub/:hub_id/publish", api.PublishHandler)
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
 	return r
 }
 
 func PublishRequest(hubID, fileID string) *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/hub/"+hubID+"/publish?file_id="+fileID, nil)
+	return httptest.NewRequest(http.MethodGet, "/hub/"+hubID+"/publish?file_id="+fileID, nil)
 }
 
 func WriteTempFile(t *testing.T, content []byte) string {
@@ -525,7 +525,7 @@ func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID stri
 		ctx.Set("host_and_hub_cache", cache)
 		ctx.Next()
 	})
-	r.POST("/hub/:hub_id/publish", api.PublishHandler)
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
 	return r
 }
 

@@ -5,11 +5,13 @@ package integration
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
@@ -167,7 +169,7 @@ func TestPublishHandler_WrongHubType_Returns500(t *testing.T) {
 //		_, ok := mgr.Get(hubID)
 //		assert.True(t, ok, "hub must still exist: defer Delete not registered at file-error return point")
 //	}
-func TestPublishHandler_HappyPath_Returns200(t *testing.T) {
+func TestPublishHandler_HappyPath(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
 	dgSrv := helpers.NewMockDeepgramServer(t, "hello world")
 	groqSrv := helpers.NewMockGroqServer(t, "processed token")
@@ -181,9 +183,31 @@ func TestPublishHandler_HappyPath_Returns200(t *testing.T) {
 		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
 	}
 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
-	assert.Equal(t, http.StatusOK, w.Code)
+
+	srv := httptest.NewServer(r)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/hub/" + hubID + "/publish?lang=ru&file_id=12345"
+	ws, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+
+	// Send audio
+	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio-data"))
+	require.NoError(t, err)
+
+	// Close cleanly
+	err = ws.WriteMessage(websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	require.NoError(t, err)
+
+	// Wait for server to close its side
+	for {
+		_, _, err := ws.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
 }
 
 func TestPublishHandler_FishError_Returns500(t *testing.T) {

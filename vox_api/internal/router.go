@@ -132,7 +132,7 @@ func NewRouter(cfg *models.Config, pool *models.Pool, logger *zap.Logger, atom z
 	corsGroups.DELETE("/hub/:hub_id", timeout, authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.PutCache(hostAndHubs), hubAPI.DeleteHubHandler)
 	corsGroups.GET("/hub/:hub_id/listen", hubAPI.IsHubIDValid, hubAPI.ListenHandler)
 	corsGroups.GET("/hub/:hub_id/reconnect", timeout, authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.PutCache(hostAndHubs), hubAPI.ReconnectHandler)
-	corsGroups.POST("/hub/:hub_id/publish", authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.IsContentTypeValid, hubAPI.PutCache(hostAndHubs), hubAPI.OpenAISDK, hubAPI.PublishHandler)
+	corsGroups.GET("/hub/:hub_id/publish", authAPI.IsAuthorized, hubAPI.IsHubIDValid, hubAPI.IsContentTypeValid, hubAPI.PutCache(hostAndHubs), hubAPI.OpenAISDK, hubAPI.PublishHandler)
 
 	corsGroups.GET("/user/info", timeout, authAPI.IsAuthorized, userAPI.InfoHandler)
 	corsGroups.GET("/user/hubs", timeout, authAPI.IsAuthorized, hubAPI.PutCache(hostAndHubs), userAPI.HubsHandler)
