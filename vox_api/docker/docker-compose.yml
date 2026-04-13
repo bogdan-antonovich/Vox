@@ -237,7 +237,7 @@ services:
     networks:
       - vox_network
     deploy:
-      replicas: 2
+      replicas: 1
       restart_policy:
         condition: on-failure
       update_config:
