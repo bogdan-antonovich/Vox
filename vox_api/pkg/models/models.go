@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
@@ -87,4 +88,18 @@ func GetLogger(ctx *gin.Context) *zap.Logger {
 	} else {
 		panic("no logger found in context")
 	}
+}
+
+func GetWSUpgrader(ctx *gin.Context, log *zap.Logger) (*websocket.Upgrader, bool) {
+	if u, ok := ctx.Get("ws_upgrader"); ok {
+		switch v := u.(type) {
+		case *websocket.Upgrader:
+			return v, true
+		default:
+			log.Error("ws_upgrader is not a *websocket.Upgrader")
+		}
+	} else {
+		log.Error("no ws_upgrader found in context")
+	}
+	return nil, false
 }

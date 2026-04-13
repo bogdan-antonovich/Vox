@@ -519,6 +519,60 @@ func TestPublishHandler_MissingFileID_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestPublishHandler_MissingWSUpgrader_Returns500(t *testing.T) {
+	h := hub.NewHub(uuid.New().String())
+	defer h.Close()
+	userID := uuid.New().String()
+	cache := hub.NewHostAndHubs()
+	cache.AddHub(userID, h.ID)
+
+	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.HappyHubDB("", "", "")}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(helpers.InjectLogger(zaptest.NewLogger(t)))
+	r.Use(helpers.InjectHub(h))
+	// No InjectWSUpgrader — intentionally missing
+	r.Use(func(ctx *gin.Context) {
+		ctx.Set("user_id", userID)
+		ctx.Set("voice_agent_builder", mocks.HappyVoiceAgentBuilder())
+		ctx.Set("host_and_hub_cache", cache)
+		ctx.Next()
+	})
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "12345"))
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestPublishHandler_InvalidWSUpgrader_Returns500(t *testing.T) {
+	h := hub.NewHub(uuid.New().String())
+	defer h.Close()
+	userID := uuid.New().String()
+	cache := hub.NewHostAndHubs()
+	cache.AddHub(userID, h.ID)
+
+	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.HappyHubDB("", "", "")}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(helpers.InjectLogger(zaptest.NewLogger(t)))
+	r.Use(helpers.InjectHub(h))
+	r.Use(func(ctx *gin.Context) {
+		ctx.Set("user_id", userID)
+		ctx.Set("ws_upgrader", "not-an-upgrader")
+		ctx.Set("voice_agent_builder", mocks.HappyVoiceAgentBuilder())
+		ctx.Set("host_and_hub_cache", cache)
+		ctx.Next()
+	})
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "12345"))
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
 // func TestPublishHandler_DBNotOwnerError_Returns403(t *testing.T) {
 // 	h := hub.NewHub(uuid.New().String())
 // 	defer h.Close()

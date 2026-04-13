@@ -360,6 +360,15 @@ func NewHubsRouter(t *testing.T, api *user.UserAPI, cache *hub.HostAndHubs, user
 	return r
 }
 
+func InjectWSUpgrader() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.Set("ws_upgrader", &websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool { return true },
+		})
+		ctx.Next()
+	}
+}
+
 func NewHubsRequest() *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/user/hubs", nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -372,7 +381,8 @@ func NewPublishRouterNoUserID(t *testing.T, api *hub.HubAPI, h *hub.Hub) *gin.En
 	r := gin.New()
 	r.Use(InjectLogger(zaptest.NewLogger(t)))
 	r.Use(InjectHub(h))
-	r.POST("/hub/:hub_id/publish", api.PublishHandler)
+	r.Use(InjectWSUpgrader())
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
 	return r
 }
 
@@ -381,6 +391,7 @@ func NewPublishRouterNoHub(t *testing.T, api *hub.HubAPI, userID string) *gin.En
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(InjectLogger(zaptest.NewLogger(t)))
+	r.Use(InjectWSUpgrader())
 	r.Use(func(ctx *gin.Context) {
 		ctx.Set("user_id", userID)
 		ctx.Set("host_and_hub_cache", hub.NewHostAndHubs())
@@ -518,6 +529,7 @@ func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID stri
 	r := gin.New()
 	r.Use(InjectLogger(zaptest.NewLogger(t)))
 	r.Use(InjectHub(h))
+	r.Use(InjectWSUpgrader())
 	r.Use(func(ctx *gin.Context) {
 		ctx.Set("user_id", userID)
 		ctx.Set("voice_agent_builder", VABuilder)

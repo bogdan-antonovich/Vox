@@ -290,6 +290,7 @@ func (h *HubAPI) FishSDK(ctx *gin.Context) {
 			fishaudio.WithBaseURL(h.Cfg.FishAudioBaseURL),
 		).TTS,
 	})
+	ctx.Next()
 }
 
 func (h *HubAPI) OpenAISDK(ctx *gin.Context) {
@@ -299,6 +300,7 @@ func (h *HubAPI) OpenAISDK(ctx *gin.Context) {
 			option.WithBaseURL(h.Cfg.OpenAIBaseURL),
 		),
 	})
+	ctx.Next()
 }
 
 type Closer interface {
@@ -310,6 +312,16 @@ func doCloser(cl Closer, log *zap.Logger) {
 	if err != nil {
 		log.Error("Failed to close reader", zap.Error(err))
 	}
+}
+
+func (h *HubAPI) WsUpgrader(ctx *gin.Context) {
+	ctx.Set("ws_upgrader", &websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			return origin == "https://bogdanantonovich.com" || origin == "https://www.bogdanantonovich.com"
+		},
+	})
+	ctx.Next()
 }
 
 // PublishHandler godoc
@@ -326,18 +338,17 @@ func doCloser(cl Closer, log *zap.Logger) {
 // @Security     CookieAuth
 // @Router       /hub/{hub_id}/publish [get]
 func (h *HubAPI) PublishHandler(ctx *gin.Context) {
-	upgrader := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			origin := r.Header.Get("Origin")
-			return origin == "https://bogdanantonovich.com" || origin == "https://www.bogdanantonovich.com"
-		},
-	}
-
 	log := mod.GetLogger(ctx)
 	transcription := NewStringChanBuf(1)
 	tokens := NewStringChanBuf(1)
 	groqErrors := NewErrorChanBuf(1)
 	deepgramErrors := NewErrorChanBuf(1)
+
+	upgrader, ok := mod.GetWSUpgrader(ctx, log)
+	if !ok {
+		ctx.Data(http.StatusInternalServerError, mod.APP_JSON, mod.HttpError(mod.INTERNAL_ERROR_CODE, mod.INTERNAL_ERROR_MSG))
+		return
+	}
 
 	userID, ok := helpers.IsValString(ctx, "user_id")
 	if !ok {
