@@ -430,6 +430,11 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 
 	g, gctx := errgroup.WithContext(ctx.Request.Context())
 
+	go func() {
+		<-gctx.Done()
+		pw.CloseWithError(gctx.Err())
+	}()
+
 	deepgram := Deepgram{
 		ApiKey:  h.Cfg.DeepgramAPIKey,
 		BaseURL: h.Cfg.DeepgramBaseURL,
