@@ -344,27 +344,21 @@ func TestPublishHandler_HappyPath_HubRemovedFromManagerAfterReturn(t *testing.T)
 
 func TestPublishHandler_HappyPath_AudioChunkReachesHubConsumer(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-
 	const expectedAudio = "fish-audio-bytes"
-
 	dgSrv := helpers.NewMockDeepgramServer(t, "hello")
 	groqSrv := helpers.NewMockGroqServer(t, "token")
 	fishSrv := helpers.NewMockFishAudioServer(t, []byte(expectedAudio))
-
 	mgr := hub.NewManager()
 	hubID := mgr.New()
 	h, _ := mgr.Get(hubID)
-
 	consumer, ch := helpers.NewConsumer(h)
 	defer h.RemoveConsumer(consumer.ID)
-
 	received := make(chan []byte, 16)
 	go func() {
 		for chunk := range ch {
 			received <- chunk
 		}
 	}()
-
 	api := &hub.HubAPI{
 		MGR: mgr,
 		Cfg: vars.CfgWithMocks(dgSrv, groqSrv, fishSrv),
@@ -373,10 +367,26 @@ func TestPublishHandler_HappyPath_AudioChunkReachesHubConsumer(t *testing.T) {
 	cache := hub.NewHostAndHubs()
 	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.HappyVoiceAgentBuilder())
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
+	srv := httptest.NewServer(r)
+	defer srv.Close()
 
-	require.Equal(t, http.StatusOK, w.Code)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/hub/" + hubID + "/publish?lang=ru&file_id=12345"
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio"))
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	require.NoError(t, err)
+
+	for {
+		_, _, err := ws.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
 
 	select {
 	case chunk := <-received:

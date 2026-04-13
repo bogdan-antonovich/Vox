@@ -432,7 +432,10 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 
 	go func() {
 		<-gctx.Done()
-		pw.CloseWithError(gctx.Err())
+		if pw.CloseWithError(gctx.Err()) != nil {
+			log.Error("failed to close pipe", zap.Error(err))
+		}
+		doCloser(conn, log)
 	}()
 
 	deepgram := Deepgram{
