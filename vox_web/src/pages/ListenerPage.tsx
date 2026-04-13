@@ -57,11 +57,38 @@ export function ListenerPage() {
 
     const streamUrl = hubApi.getListenUrl(hubId.trim());
 
-    if (!audioRef.current) return;
-    audioRef.current.src = streamUrl;
-    audioRef.current.load();
-
     try {
+      const response = await fetch(streamUrl);
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to connect");
+      }
+
+      const mediaSource = new MediaSource();
+      if (!audioRef.current) return;
+      audioRef.current.src = URL.createObjectURL(mediaSource);
+
+      mediaSource.addEventListener("sourceopen", async () => {
+        const sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
+        const reader = response.body!.getReader();
+        readerRef.current = reader;
+
+        const pump = async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            if (sourceBuffer.updating) {
+              await new Promise((r) =>
+                sourceBuffer.addEventListener("updateend", r, { once: true }),
+              );
+            }
+            sourceBuffer.appendBuffer(value);
+          }
+        };
+
+        pump().catch(console.error);
+      });
+
       await audioRef.current.play();
       connect();
     } catch (err) {
@@ -72,7 +99,10 @@ export function ListenerPage() {
     }
   }, [hubId, connect]);
 
+  const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
+
   const handleStop = useCallback(() => {
+    readerRef.current?.cancel();
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = "";
