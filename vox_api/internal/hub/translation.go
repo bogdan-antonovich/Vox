@@ -2,12 +2,9 @@ package hub
 
 import (
 	"context"
-	"errors"
-	"io"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
-	"github.com/openai/openai-go/packages/ssestream"
 	"go.uber.org/zap"
 )
 
@@ -21,31 +18,31 @@ type Groq struct {
 	log           *zap.Logger
 }
 
-func (g *Groq) handleStream(ctx context.Context, stream *ssestream.Stream[openai.ChatCompletionChunk]) error {
-	for stream.Next() {
-		chunk := stream.Current()
-		if len(chunk.Choices) > 0 {
-			content := chunk.Choices[0].Delta.Content
-			if content != "" {
-				select {
-				case g.tokens.Ch <- content:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		}
-	}
-	return nil
-}
+// func (g *Groq) handleStream(ctx context.Context, stream *ssestream.Stream[openai.ChatCompletionChunk]) error {
+// 	g.log.Debug("Groq.handleStream", zap.Bool("ctx_is_nil", ctx == nil), zap.Bool("stream_is_nil", stream == nil))
+// 	for stream.Next() {
+// 		chunk := stream.Current()
+// 		if len(chunk.Choices) > 0 {
+// 			content := chunk.Choices[0].Delta.Content
+// 			if content != "" {
+// 				g.log.Debug("Translation of transcript received", zap.String("content", content))
+// 				select {
+// 				case g.tokens.Ch <- content:
+// 				case <-ctx.Done():
+// 					return ctx.Err()
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return nil
+// }
 
-// https://api.groq.com/openai/v1
 func (g *Groq) do(ctx context.Context) (err error) {
-	g.log.Debug("Groq.handleStream", zap.Bool("ctx_is_nil", ctx == nil))
+	g.log.Debug("Groq.do", zap.Bool("ctx_is_nil", ctx == nil))
 	client := openai.NewClient(
 		option.WithAPIKey(g.ApiKey),
 		option.WithBaseURL(g.BaseURL),
 	)
-
 	for {
 		select {
 		case transcript, ok := <-g.transcription.Ch:
@@ -53,23 +50,28 @@ func (g *Groq) do(ctx context.Context) (err error) {
 				g.log.Debug("Groq transcription channel closed")
 				return nil
 			}
-
-			stream := client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
+			g.log.Debug("Groq got transcript", zap.String("transcript", transcript))
+			resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 				Model: g.Model,
 				Messages: []openai.ChatCompletionMessageParamUnion{
 					openai.UserMessage(transcript),
 				},
 			})
-
-			if err = g.handleStream(ctx, stream); err != nil {
+			if err != nil {
+				g.log.Error("Groq completion error", zap.Error(err))
 				return err
 			}
-
-			if err = stream.Err(); err != nil && !errors.Is(err, io.EOF) {
-				g.log.Error("Groq stream error", zap.Error(err))
-				return err
+			if len(resp.Choices) > 0 {
+				content := resp.Choices[0].Message.Content
+				if content != "" {
+					g.log.Debug("Groq translation complete", zap.String("content", content))
+					select {
+					case g.tokens.Ch <- content:
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+				}
 			}
-
 		case <-ctx.Done():
 			return ctx.Err()
 		}
