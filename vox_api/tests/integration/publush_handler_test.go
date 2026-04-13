@@ -55,7 +55,7 @@ func TestPublishHandler_WrongHubType_Returns500(t *testing.T) {
 		ctx.Next()
 	})
 	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.HappyHubDB("", "", "")}
-	r.POST("/hub/:hub_id/publish", api.PublishHandler)
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(uuid.New().String(), "12345"))
@@ -253,7 +253,7 @@ func TestPublishHandler_NoFishBuilder_Returns500(t *testing.T) {
 		ctx.Set("host_and_hub_cache", c)
 		ctx.Next()
 	})
-	r.POST("/hub/:hub_id/publish", api.PublishHandler)
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -284,7 +284,7 @@ func TestPublishHandler_InvalidFishBuilder_Returns500(t *testing.T) {
 		ctx.Set("host_and_hub_cache", c)
 		ctx.Next()
 	})
-	r.POST("/hub/:hub_id/publish", api.PublishHandler)
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(hubID, "12345"))
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -481,7 +481,7 @@ func TestPublishHandler_UserNotOwner_Returns403(t *testing.T) {
 		ctx.Set("host_and_hub_cache", cache)
 		ctx.Next()
 	})
-	r.POST("/hub/:hub_id/publish", api.PublishHandler)
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
 
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "12346"))
@@ -501,7 +501,7 @@ func TestPublishHandler_WrongCacheType_Returns500(t *testing.T) {
 		ctx.Next()
 	})
 	api := &hub.HubAPI{MGR: hub.NewManager(), Cfg: vars.PublishCfg(), DB: helpers.HappyHubDB("", "", "")}
-	r.POST("/hub/:hub_id/publish", api.PublishHandler)
+	r.GET("/hub/:hub_id/publish", api.PublishHandler)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, helpers.PublishRequest(h.ID, "1231326"))
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
