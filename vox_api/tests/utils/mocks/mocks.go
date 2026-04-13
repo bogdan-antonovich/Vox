@@ -127,12 +127,19 @@ type MockVoiceAgent struct {
 func (m *MockVoiceAgent) NewStream(ctx context.Context) (hub.Stream, error)   { return nil, nil }
 func (m *MockVoiceAgent) Handle(ctx context.Context, stream hub.Stream) error { return nil }
 func (m *MockVoiceAgent) Do(ctx context.Context) error {
-	for range m.tokens.Ch {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case _, ok := <-m.tokens.Ch:
+			if !ok {
+				if m.hub != nil {
+					m.hub.Publish([]byte("fish-audio-bytes"))
+				}
+				return m.DoFunc(ctx)
+			}
+		}
 	}
-	if m.hub != nil {
-		m.hub.Publish([]byte("fish-audio-bytes"))
-	}
-	return m.DoFunc(ctx)
 }
 
 type MockVoiceAgentBuilder struct {
