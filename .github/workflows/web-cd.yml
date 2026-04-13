@@ -98,8 +98,8 @@ jobs:
                 --format '{{.CurrentState}}' \
                 | grep -c "Failed" || true)
 
-              if [ "$REPLICAS" = "2/2" ] && [ "$FAILED" -eq 0 ]; then
-                echo "Deployment healthy — 2/2 replicas running."
+              if [ "$REPLICAS" = "1/1" ] && [ "$FAILED" -eq 0 ]; then
+                echo "Deployment healthy — 1/1 replicas running."
                 break
               fi
 

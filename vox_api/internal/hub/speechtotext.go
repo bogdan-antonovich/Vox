@@ -117,6 +117,8 @@ func (d *Deepgram) do(rd io.Reader) (err error) {
 		return errors.New("deepgram connection timed out")
 	}
 
+	defer d.client.Stop()
+
 	pr, pw := io.Pipe()
 	go func() {
 		defer d.closer(pw)
