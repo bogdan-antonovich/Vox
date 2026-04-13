@@ -283,13 +283,6 @@ func (h *HubAPI) ListenHandler(ctx *gin.Context) {
 	log.Debug("Audio stream ended", zap.String("hub_id", hub.ID), zap.String("consumer_id", consumerID))
 }
 
-func closeReader(rd io.ReadCloser, log *zap.Logger) {
-	err := rd.Close()
-	if err != nil {
-		log.Error("Failed to close reader", zap.Error(err))
-	}
-}
-
 func (h *HubAPI) FishSDK(ctx *gin.Context) {
 	ctx.Set("voice_agent_builder", &BuildHolder{
 		client: fishaudio.NewClient(
@@ -306,6 +299,17 @@ func (h *HubAPI) OpenAISDK(ctx *gin.Context) {
 			option.WithBaseURL(h.Cfg.OpenAIBaseURL),
 		),
 	})
+}
+
+type Closer interface {
+	Close() error
+}
+
+func doCloser(cl Closer, log *zap.Logger) {
+	err := cl.Close()
+	if err != nil {
+		log.Error("Failed to close reader", zap.Error(err))
+	}
 }
 
 // PublishHandler godoc
@@ -407,7 +411,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		log.Error("WebSocket upgrade failed", zap.Error(err))
 		return
 	}
-	defer conn.Close()
+	defer doCloser(conn, log)
 
 	log.Debug("Audio publishing started", zap.String("user_id", userID), zap.String("hub_id", hub.ID))
 
@@ -443,7 +447,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 	}
 
 	g.Go(func() error {
-		defer pw.Close()
+		defer doCloser(pw, log)
 		for {
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {

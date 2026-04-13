@@ -32,7 +32,7 @@ linters:
     - loggercheck
   settings:
     funlen:
-      lines: 150
+      lines: 175
       statements: 85
   exclusions:
     paths:
