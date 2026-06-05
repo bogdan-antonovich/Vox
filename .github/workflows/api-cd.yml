@@ -49,7 +49,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: "smarttranslator_api/docker/docker-compose.yml,smarttranslator_api/cfg/loki-config.yml"
-          target: "~/smarttranslator_api/"
+          target: "~/vox_api/"
           strip_components: 1
 
       - name: Deploy to VPS
@@ -143,9 +143,9 @@ jobs:
             sync_secret "E2E_PASSWORD_FILE"         "$E2E_PASSWORD"
             sync_secret "OPENAI_API_KEY_FILE"       "$OPENAI_API_KEY"
 
-            sync_config "loki_config" ~/smarttranslator_api/cfg/loki-config.yml
+            sync_config "loki_config" ~/vox_api/cfg/loki-config.yml
 
-            cd ~/smarttranslator_api
+            cd ~/vox_api
 
             export TAG="$TAG"
             export DOCKER_REGISTRY="$REGISTRY_USER"
@@ -162,12 +162,12 @@ jobs:
               --with-registry-auth \
               --prune \
               -c docker/docker-compose.resolved.yml \
-              smarttranslator_stack
+              vox_stack
 
             docker service update \
               --force \
               --image $REGISTRY_USER/smart-translator:${TAG} \
-              smarttranslator_stack_vox
+              vox_stack_vox
 
             echo "Waiting for vox service to stabilize..."
 
@@ -177,7 +177,7 @@ jobs:
             until [ $WAIT_COUNT -ge $MAX_WAIT ]; do
               ALL_HEALTHY=true
 
-              for SERVICE in smarttranslator_stack_vox smarttranslator_stack_db smarttranslator_stack_loki smarttranslator_stack_grafana; do
+              for SERVICE in vox_stack_vox vox_stack_db vox_stack_loki vox_stack_grafana; do
                 REPLICAS=$(docker service ls \
                   --filter name=$SERVICE \
                   --format '{{.Replicas}}')
@@ -198,7 +198,7 @@ jobs:
               done
 
               # migrate — одноразовый, проверяем что завершился успешно
-              MIGRATE_STATE=$(docker service ps smarttranslator_stack_migrate \
+              MIGRATE_STATE=$(docker service ps vox_stack_migrate \
                 --format '{{.CurrentState}}' \
                 | head -1)
 

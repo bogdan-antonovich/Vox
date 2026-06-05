@@ -49,7 +49,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: "smarttranslator_web/docker/docker-compose.yml,smarttranslator_web/docker/nginx.conf"
-          target: "~/smarttranslator_web/"
+          target: "~/vox_web/"
           strip_components: 2
 
       - name: Deploy to VPS
@@ -64,7 +64,7 @@ jobs:
             echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login \
               -u "${{ secrets.REGISTRY_USER }}" --password-stdin
 
-            cd ~/smarttranslator_web
+            cd ~/vox_web
 
             export TAG="${{ env.TAG }}"
             export DOCKER_REGISTRY="${{ secrets.REGISTRY_USER }}"
@@ -75,12 +75,12 @@ jobs:
               --with-registry-auth \
               --prune \
               -c docker-compose.resolved.yml \
-              smarttranslator_web_stack
+              vox_web_stack
 
             docker service update \
               --force \
               --image ${{ secrets.REGISTRY_USER }}/smart-translator-web:${{ env.TAG }} \
-              smarttranslator_web_stack_web
+              vox_web_stack_web
 
             echo "Waiting for web service to stabilize..."
 
@@ -89,10 +89,10 @@ jobs:
 
             until [ $WAIT_COUNT -ge $MAX_WAIT ]; do
               REPLICAS=$(docker service ls \
-                --filter name=smarttranslator_web_stack_web \
+                --filter name=vox_web_stack_web \
                 --format '{{.Replicas}}')
 
-              FAILED=$(docker service ps smarttranslator_web_stack_web \
+              FAILED=$(docker service ps vox_web_stack_web \
                 --filter "desired-state=running" \
                 --no-trunc \
                 --format '{{.CurrentState}}' \

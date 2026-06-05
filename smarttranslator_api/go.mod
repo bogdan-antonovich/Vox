@@ -1,6 +1,6 @@
 module smarttranslator
 
-go 1.25.0
+go 1.26.3
 
 require (
 	github.com/bytedance/sonic v1.15.0
