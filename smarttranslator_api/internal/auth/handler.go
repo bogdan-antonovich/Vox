@@ -333,7 +333,7 @@ func (a *AuthAPI) LoginHandler(ctx *gin.Context) {
 	}
 
 	setTokenCookies(ctx, accessToken, refreshToken)
-	ctx.Data(http.StatusOK, mod.APP_JSON, []byte(`{"ok": true, status: "login"}`))
+	ctx.Status(http.StatusOK)
 }
 
 // RefreshHandler godoc
