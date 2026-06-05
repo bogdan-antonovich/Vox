@@ -527,7 +527,7 @@ func NewPublishRouterFull(t *testing.T, api *hub.HubAPI, h *hub.Hub, userID stri
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(InjectLogger(zaptest.NewLogger(t)))
+	r.Use(InjectLogger(zap.NewNop()))
 	r.Use(InjectHub(h))
 	r.Use(InjectWSUpgrader())
 	r.Use(func(ctx *gin.Context) {
