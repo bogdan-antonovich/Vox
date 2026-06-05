@@ -38,6 +38,7 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.8.0
+          install-mode: goinstall
           working-directory: smarttranslator_api
 
       - name: Check go mod tidy
