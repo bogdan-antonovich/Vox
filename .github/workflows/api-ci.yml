@@ -53,7 +53,7 @@ jobs:
         uses: golang/govulncheck-action@v1
         with:
           go-version-file: smarttranslator_api/go.mod
-          work-dir: vox_api
+          work-dir: smarttranslator_api
 
   unit-tests:
     needs: quality-gate
