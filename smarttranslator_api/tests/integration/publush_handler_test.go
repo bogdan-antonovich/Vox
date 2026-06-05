@@ -429,7 +429,8 @@ func TestPublishHandler_DeepgramUnreachable(t *testing.T) {
 
 func TestPublishHandler_GroqUnreachable(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-	dgSrv := helpers.NewMockDeepgramServer(t, "hello world")
+	// Cyrillic transcript so it passes the lang=ru script filter and actually reaches Groq.
+	dgSrv := helpers.NewMockDeepgramServer(t, "привет мир")
 	deadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	deadSrv.Close()
 	fishSrv := helpers.NewMockFishAudioServer(t, []byte("chunk"))
