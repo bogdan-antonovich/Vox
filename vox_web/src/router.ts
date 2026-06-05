@@ -7,7 +7,7 @@ import ListenView from './views/ListenView.vue'
 import ProfileView from './views/ProfileView.vue'
 
 const router = createRouter({
-  history: createWebHistory('/vox/'),
+  history: createWebHistory('/'),
   routes: [
     { path: '/',                       component: LoginView },
     { path: '/host',                   component: DashboardView,  meta: { auth: true } },

@@ -1,7 +1,7 @@
 // @title           Vox AI SI API
 // @version         1.0
 // @description     Vox API server
-// @host            bogdanantonovich.com/vox/api
+// @host            smarttranslator.store/api
 // @BasePath        /
 // @schemes         https
 

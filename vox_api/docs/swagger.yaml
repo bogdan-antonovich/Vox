@@ -44,7 +44,7 @@ definitions:
       picture:
         type: string
     type: object
-host: api.bogdanantonovich.com
+host: smarttranslator.store/api
 info:
   contact:
     email: programjibogdan@gmail.com

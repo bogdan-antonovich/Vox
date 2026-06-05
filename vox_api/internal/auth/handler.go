@@ -17,8 +17,8 @@ import (
 )
 
 func setTokenCookies(ctx *gin.Context, accessToken, refreshToken string) {
-	ctx.SetCookie("access_token", accessToken, 900, "/", ".bogdanantonovich.com", true, true)
-	ctx.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", ".bogdanantonovich.com", true, true)
+	ctx.SetCookie("access_token", accessToken, 900, "/", ".smarttranslator.store", true, true)
+	ctx.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", ".smarttranslator.store", true, true)
 }
 
 func (a *AuthAPI) IsAdmin(ctx *gin.Context) {
@@ -211,7 +211,7 @@ func (a *AuthAPI) ProviderCallbackHandler(ctx *gin.Context) {
 	}
 
 	setTokenCookies(ctx, accessToken, refreshToken)
-	ctx.Redirect(http.StatusTemporaryRedirect, a.Cfg.FrontendURL+"/#/admin")
+	ctx.Redirect(http.StatusTemporaryRedirect, a.Cfg.FrontendURL+"/host")
 }
 
 // SignUpHandler godoc

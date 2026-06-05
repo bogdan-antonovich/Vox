@@ -112,8 +112,8 @@ func NewRouter(cfg *models.Config, pool *models.Pool, logger *zap.Logger, atom z
 	corsGroups := engine.Group("/")
 	corsGroups.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
-			"https://bogdanantonovich.com",
-			"https://www.bogdanantonovich.com",
+			"https://smarttranslator.store",
+			"https://www.smarttranslator.store",
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Authorization"},

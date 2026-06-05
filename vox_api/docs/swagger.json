@@ -12,7 +12,7 @@
         },
         "version": "1.0"
     },
-    "host": "api.bogdanantonovich.com",
+    "host": "smarttranslator.store/api",
     "basePath": "/",
     "paths": {
         "/admin/logs/level": {

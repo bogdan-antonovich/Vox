@@ -1,8 +1,8 @@
 import axios from 'axios'
 import type { UserInfo } from './store'
 
-export const BASE = 'https://bogdanantonovich.com/vox/api'
-const WS_BASE = 'wss://bogdanantonovich.com/vox/api'
+export const BASE = 'https://smarttranslator.store/api'
+const WS_BASE = 'wss://smarttranslator.store/api'
 
 export const client = axios.create({ baseURL: BASE, withCredentials: true })
 

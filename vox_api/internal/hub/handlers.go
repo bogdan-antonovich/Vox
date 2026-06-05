@@ -323,7 +323,7 @@ func (h *HubAPI) WsUpgrader(ctx *gin.Context) {
 	ctx.Set("ws_upgrader", &websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			origin := r.Header.Get("Origin")
-			return origin == "https://bogdanantonovich.com" || origin == "https://www.bogdanantonovich.com"
+			return origin == "https://smarttranslator.store" || origin == "https://www.smarttranslator.store"
 		},
 	})
 	ctx.Next()
