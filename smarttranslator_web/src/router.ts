@@ -17,8 +17,18 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
-  if (to.meta.auth && !auth.loading && !auth.user) return '/'
+router.beforeEach(async (to) => {
+  if (!to.meta.auth) return
+
+  if (auth.loading) {
+    await new Promise<void>(resolve => {
+      const interval = setInterval(() => {
+        if (!auth.loading) { clearInterval(interval); resolve() }
+      }, 10)
+    })
+  }
+
+  if (!auth.user) return '/'
 })
 
 export default router
