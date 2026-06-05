@@ -1,0 +1,210 @@
+package hub
+
+import (
+	"context"
+	"errors"
+	"io"
+	"unicode"
+
+	msginterfaces "github.com/deepgram/deepgram-go-sdk/v3/pkg/api/listen/v1/websocket/interfaces"
+	interfaces "github.com/deepgram/deepgram-go-sdk/v3/pkg/client/interfaces"
+	client "github.com/deepgram/deepgram-go-sdk/v3/pkg/client/listen"
+	websocketv1 "github.com/deepgram/deepgram-go-sdk/v3/pkg/client/listen/v1/websocket"
+	"go.uber.org/zap"
+)
+
+type Deepgram struct {
+	ApiKey        string
+	BaseURL       string
+	Options       interfaces.LiveTranscriptionOptions
+	TargetLang    string
+	client        *websocketv1.WSCallback
+	transcription *StringChan
+	errors        *ErrorChan
+	log           *zap.Logger
+	ctx           context.Context
+	done          chan struct{}
+}
+
+// scriptMatches returns true if the transcript contains characters from the
+// expected script for the given BCP-47 language code.
+// For languages that share the Latin script (e.g. "de", "fr") it always returns
+// true because we cannot distinguish them from each other by script alone.
+func scriptMatches(transcript, lang string) bool {
+	switch lang {
+	case "ru", "uk", "bg", "sr", "mk", "be":
+		for _, r := range transcript {
+			if unicode.Is(unicode.Cyrillic, r) {
+				return true
+			}
+		}
+		return false
+	case "zh":
+		for _, r := range transcript {
+			if unicode.Is(unicode.Han, r) {
+				return true
+			}
+		}
+		return false
+	case "ja":
+		for _, r := range transcript {
+			if unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Han, r) {
+				return true
+			}
+		}
+		return false
+	case "ar":
+		for _, r := range transcript {
+			if unicode.Is(unicode.Arabic, r) {
+				return true
+			}
+		}
+		return false
+	case "ko":
+		for _, r := range transcript {
+			if unicode.Is(unicode.Hangul, r) {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
+}
+
+func (d *Deepgram) Open(or *msginterfaces.OpenResponse) error {
+	d.log.Debug("Deepgram.Open", zap.Any("or", or))
+	d.log.Debug("Deepgram connection opened")
+	return nil
+}
+
+func (d *Deepgram) Message(mr *msginterfaces.MessageResponse) error {
+	d.log.Debug("Deepgram.Message", zap.Any("mr", mr))
+	if mr != nil {
+		if len(mr.Channel.Alternatives) > 0 {
+			transcript := mr.Channel.Alternatives[0].Transcript
+			if transcript != "" {
+				if !scriptMatches(transcript, d.TargetLang) {
+					d.log.Debug("Deepgram transcript skipped (wrong language)", zap.String("transcript", transcript), zap.String("target_lang", d.TargetLang))
+					return nil
+				}
+				d.log.Debug("Deepgram transcript received", zap.String("transcript", transcript))
+				select {
+				case d.transcription.Ch <- transcript:
+				case <-d.ctx.Done():
+					return d.ctx.Err()
+				}
+			}
+		} else {
+			d.log.Warn("Deepgram transcript holder is empty", zap.Any("mr", mr))
+		}
+	} else {
+		d.log.Warn("Deepgram message is nil")
+	}
+	return nil
+}
+
+func (d *Deepgram) Error(er *msginterfaces.ErrorResponse) error {
+	d.log.Debug("Deepgram.Error", zap.Any("er", er))
+	var err error
+	if er != nil {
+		d.log.Error("Deepgram error",
+			zap.String("dg_code", er.ErrCode),
+			zap.String("dg_description", er.Description),
+			zap.String("dg_msg", er.ErrMsg),
+			zap.String("dg_type", er.Type),
+			zap.String("dg_variant", er.Variant),
+		)
+		err = errors.New(er.ErrMsg)
+		select {
+		case d.errors.Ch <- err:
+		default:
+		}
+	} else {
+		d.log.Error("Deepgram error", zap.String("err", "Unknown error"))
+		err = errors.New("unknown error")
+	}
+	return err
+}
+
+func (d *Deepgram) Close(cr *msginterfaces.CloseResponse) error {
+	d.log.Debug("Deepgram.Close", zap.Any("cr", cr))
+	close(d.done)
+	return nil
+}
+
+func (d *Deepgram) Metadata(md *msginterfaces.MetadataResponse) error            { return nil }
+func (d *Deepgram) SpeechStarted(ssr *msginterfaces.SpeechStartedResponse) error { return nil }
+func (d *Deepgram) UtteranceEnd(ur *msginterfaces.UtteranceEndResponse) error    { return nil }
+func (d *Deepgram) UnhandledEvent(byData []byte) error                           { return nil }
+
+func (d *Deepgram) handleStream(rd io.Reader) error {
+	d.log.Debug("Deepgram.handleStream", zap.Bool("rd_is_nil", rd == nil))
+	err := d.client.Stream(rd)
+	if err != nil && !errors.Is(err, io.EOF) {
+		d.log.Error("Deepgram stream ends with an error", zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (d *Deepgram) closer(pw *io.PipeWriter) {
+	err := pw.Close()
+	if err != nil {
+		d.log.Error("PipeWriter close error", zap.Error(err))
+	}
+}
+
+func (d *Deepgram) do(rd io.Reader) (err error) {
+	d.log.Debug("Deepgram.do", zap.Bool("ctx_is_nil", d.ctx == nil), zap.Bool("rd_is_nil", rd == nil))
+
+	d.done = make(chan struct{})
+	d.client, err = client.NewWSUsingCallback(d.ctx, d.ApiKey, &interfaces.ClientOptions{Host: d.BaseURL}, &d.Options, d)
+	if err != nil {
+		d.log.Error("Deepgram connection error", zap.Error(err))
+		return err
+	}
+	if !d.client.Connect() {
+		d.log.Error("Deepgram connection timed out")
+		return errors.New("deepgram connection timed out")
+	}
+
+	defer d.client.Stop()
+
+	pr, pw := io.Pipe()
+	go func() {
+		defer d.closer(pw)
+		buf := make([]byte, 4096)
+		for {
+			select {
+			case <-d.ctx.Done():
+				return
+			default:
+				n, err := rd.Read(buf)
+				if n > 0 {
+					_, err = pw.Write(buf[:n])
+					if err != nil {
+						d.log.Error("PipeWriter write error", zap.Error(err))
+						return
+					}
+				}
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	if err = d.handleStream(pr); err != nil {
+		return
+	}
+
+	select {
+	case err = <-d.errors.Ch:
+		return err
+	case <-d.done:
+		return nil
+	case <-d.ctx.Done():
+		return d.ctx.Err()
+	}
+}

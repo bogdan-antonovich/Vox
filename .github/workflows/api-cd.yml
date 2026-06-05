@@ -35,12 +35,12 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: vox_api
-          file: vox_api/docker/prod.Dockerfile
+          context: smarttranslator_api
+          file: smarttranslator_api/docker/prod.Dockerfile
           push: true
-          tags: ${{ secrets.REGISTRY_USER }}/vox:${{ env.TAG }}
-          cache-from: type=gha,scope=vox-prod
-          cache-to: type=gha,mode=max,scope=vox-prod
+          tags: ${{ secrets.REGISTRY_USER }}/smart-translator:${{ env.TAG }}
+          cache-from: type=gha,scope=smart-translator-prod
+          cache-to: type=gha,mode=max,scope=smart-translator-prod
 
       - name: Copy compose to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -48,8 +48,8 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "vox_api/docker/docker-compose.yml,vox_api/cfg/loki-config.yml"
-          target: "~/vox_api/"
+          source: "smarttranslator_api/docker/docker-compose.yml,smarttranslator_api/cfg/loki-config.yml"
+          target: "~/smarttranslator_api/"
           strip_components: 1
 
       - name: Deploy to VPS
@@ -143,9 +143,9 @@ jobs:
             sync_secret "E2E_PASSWORD_FILE"         "$E2E_PASSWORD"
             sync_secret "OPENAI_API_KEY_FILE"       "$OPENAI_API_KEY"
 
-            sync_config "loki_config" ~/vox_api/cfg/loki-config.yml
+            sync_config "loki_config" ~/smarttranslator_api/cfg/loki-config.yml
 
-            cd ~/vox_api
+            cd ~/smarttranslator_api
 
             export TAG="$TAG"
             export DOCKER_REGISTRY="$REGISTRY_USER"
@@ -162,12 +162,12 @@ jobs:
               --with-registry-auth \
               --prune \
               -c docker/docker-compose.resolved.yml \
-              vox_stack
+              smarttranslator_stack
 
             docker service update \
               --force \
-              --image bogdanantonovich/vox:${TAG} \
-              vox_stack_vox
+              --image $REGISTRY_USER/smart-translator:${TAG} \
+              smarttranslator_stack_vox
 
             echo "Waiting for vox service to stabilize..."
 
@@ -177,7 +177,7 @@ jobs:
             until [ $WAIT_COUNT -ge $MAX_WAIT ]; do
               ALL_HEALTHY=true
 
-              for SERVICE in vox_stack_vox vox_stack_db vox_stack_loki vox_stack_grafana; do
+              for SERVICE in smarttranslator_stack_vox smarttranslator_stack_db smarttranslator_stack_loki smarttranslator_stack_grafana; do
                 REPLICAS=$(docker service ls \
                   --filter name=$SERVICE \
                   --format '{{.Replicas}}')
@@ -198,7 +198,7 @@ jobs:
               done
 
               # migrate — одноразовый, проверяем что завершился успешно
-              MIGRATE_STATE=$(docker service ps vox_stack_migrate \
+              MIGRATE_STATE=$(docker service ps smarttranslator_stack_migrate \
                 --format '{{.CurrentState}}' \
                 | head -1)
 

@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Vox is a real-time speech-to-speech translation broadcasting platform. A host speaks into a microphone → audio is sent via WebSocket → Deepgram transcribes speech → Groq LLM translates text to English → OpenAI TTS (or Fish Audio TTS) synthesizes translated audio → audio is broadcast to listeners via chunked HTTP streaming.
+Smart Translator is a real-time speech-to-speech translation broadcasting platform. A host speaks into a microphone → audio is sent via WebSocket → Deepgram transcribes speech → Groq LLM translates text to English → OpenAI TTS (or Fish Audio TTS) synthesizes translated audio → audio is broadcast to listeners via chunked HTTP streaming.
 
 The repo is a monorepo with two active components:
-- `vox_api/` — Go backend (Gin HTTP server, REST + WebSocket)
-- `vox_web/` — React 19 + TypeScript frontend (Create React App)
-- `vox_web_old/` — Legacy Vite+React frontend, mostly unused
+- `smarttranslator_api/` — Go backend (Gin HTTP server, REST + WebSocket)
+- `smarttranslator_web/` — Vue 3 + Vite + TypeScript frontend
+- `vox_web_old/` — Legacy React frontend, unused
 
 ## Commands
 
-### Backend (`vox_api/`)
+### Backend (`smarttranslator_api/`)
 
 ```bash
 go build ./...
@@ -21,10 +21,10 @@ go test ./internal/... ./pkg/...
 go test -tags=integration ./tests/...
 go test -tags=integration -run TestPublishHandler_HappyPath ./tests/integration/
 golangci-lint run
-swag init -g cmd/vox/production/main.go   # regenerate Swagger docs
+swag init -g cmd/smarttranslator/production/main.go   # regenerate Swagger docs
 ```
 
-### Frontend (`vox_web/`)
+### Frontend (`smarttranslator_web/`)
 
 ```bash
 npm run dev        # dev server (Vite)
@@ -37,9 +37,9 @@ npm run lint       # eslint src --max-warnings 0
 
 ### Backend
 
-**Entry point**: `cmd/vox/production/main.go` — reads config from Docker secrets (files pointed to by env vars), sets up the pgx connection pool with exponential-backoff retry, initializes multi-sink zap logger (stdout, Loki, info file, error file), and calls `internal.NewRouter`.
+**Entry point**: `cmd/smarttranslator/production/main.go` — reads config from Docker secrets (files pointed to by env vars), sets up the pgx connection pool with exponential-backoff retry, initializes multi-sink zap logger (stdout, Loki, info file, error file), and calls `internal.NewRouter`.
 
-**Router** (`internal/router.go`): Registers all routes with middleware chain: zap request logger → panic recovery → rate limiter (100 req/min in-memory) → security headers → CORS (only `bogdanantonovich.com`). The active router uses flat route registration — the commented-out grouped version is the old style.
+**Router** (`internal/router.go`): Registers all routes with middleware chain: zap request logger → panic recovery → rate limiter (100 req/min in-memory) → security headers → CORS (only `smarttranslator.store`). The active router uses flat route registration — the commented-out grouped version is the old style.
 
 **Package structure**:
 - `internal/auth` — JWT access/refresh token pair (15-min access, random hex refresh stored as SHA-256 hash), Argon2id password hashing, OAuth2 (GitHub + Google)
@@ -71,13 +71,13 @@ npm run lint       # eslint src --max-warnings 0
 
 **Migrations**: SQL files in `db/migrations/`, run by goose (embedded via `//go:embed`). Deployed as a one-shot `migrate` service in Docker Swarm.
 
-**Integration tests** (`tests/integration/`): Use `testcontainers-go` to spin up a real `postgres:16` container. Build tag: `integration`. Test utilities live in `tests/utils/{db,helpers,mocks,vars}`.
+**Integration tests** (`tests/integration/`): Use `testcontainers-go` to spin up a real `postgres:16` container. Build tag: `integration`. Test utilities live in `tests/utils/{db,helpers,mocks,vars}`. `NewPublishRouterFull` uses `zap.NewNop()` (not `zaptest.NewLogger`) to avoid a data race with the Deepgram SDK's internal goroutine outliving the test.
 
 ### Frontend
 
-**Stack**: Vue 3 + Vite + TypeScript. `vite.config.ts` sets `base: '/vox/'` (the app is served under the `/vox` sub-path on the VPS).
+**Stack**: Vue 3 + Vite + TypeScript. `vite.config.ts` sets `base: '/'`.
 
-**API**: `src/api.ts` — axios client with `baseURL: https://bogdanantonovich.com/vox/api` and `withCredentials: true` (cookie auth).
+**API**: `src/api.ts` — axios client with `baseURL: https://smarttranslator.store/api` and `withCredentials: true` (cookie auth).
 
 **Auth state**: `src/store.ts` — module-level `reactive({ user, loading })`. Hydrated in `main.ts` via `/user/info` before mount. Router guard in `router.ts` redirects unauthenticated users to `/`.
 

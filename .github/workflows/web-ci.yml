@@ -3,12 +3,12 @@ name: Web CI
 on:
   push:
     paths:
-      - "vox_web/**"
+      - "smarttranslator_web/**"
       - ".github/workflows/web-ci.yml"
       - ".github/workflows/web-cd.yml"
   pull_request:
     paths:
-      - "vox_web/**"
+      - "smarttranslator_web/**"
       - ".github/workflows/web-ci.yml"
 
 concurrency:
@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: vox_web
+        working-directory: smarttranslator_web
 
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: vox_web/package-lock.json
+          cache-dependency-path: smarttranslator_web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: vox_web
+        working-directory: smarttranslator_web
 
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: vox_web/package-lock.json
+          cache-dependency-path: smarttranslator_web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -71,5 +71,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist-${{ github.sha }}
-          path: vox_web/dist/
+          path: smarttranslator_web/dist/
           retention-days: 1

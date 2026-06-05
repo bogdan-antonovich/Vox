@@ -1,0 +1,254 @@
+# version: "3.9"
+
+networks:
+  vox_network:
+    driver: overlay
+
+configs:
+  loki_config:
+    external: true
+    name: loki_config_${TAG}
+
+volumes:
+  postgres_data:
+  loki_data:
+  grafana_data:
+  app_state:
+
+secrets:
+  JWT_SECRET_FILE:
+    external: true
+    name: JWT_SECRET_FILE_${TAG}
+  POSTGRES_USER_FILE:
+    external: true
+    name: POSTGRES_USER_FILE_${TAG}
+  POSTGRES_PASSWORD_FILE:
+    external: true
+    name: POSTGRES_PASSWORD_FILE_${TAG}
+  POSTGRES_HOST_FILE:
+    external: true
+    name: POSTGRES_HOST_FILE_${TAG}
+  POSTGRES_PORT_FILE:
+    external: true
+    name: POSTGRES_PORT_FILE_${TAG}
+  POSTGRES_DB_NAME_FILE:
+    external: true
+    name: POSTGRES_DB_NAME_FILE_${TAG}
+  POSTGRES_SSLMODE_FILE:
+    external: true
+    name: POSTGRES_SSLMODE_FILE_${TAG}
+  GRAFANA_PASSWORD_FILE:
+    external: true
+    name: GRAFANA_PASSWORD_FILE_${TAG}
+  DEEPGRAM_API_KEY_FILE:
+    external: true
+    name: DEEPGRAM_API_KEY_FILE_${TAG}
+  GROQ_API_KEY_FILE:
+    external: true
+    name: GROQ_API_KEY_FILE_${TAG}
+  FISH_AUDIO_API_KEY_FILE:
+    external: true
+    name: FISH_AUDIO_API_KEY_FILE_${TAG}
+  GH_CLIENT_ID_FILE:
+    external: true
+    name: GH_CLIENT_ID_FILE_${TAG}
+  GH_CLIENT_SECRET_FILE:
+    external: true
+    name: GH_CLIENT_SECRET_FILE_${TAG}
+  GOOGLE_CLIENT_ID_FILE:
+    external: true
+    name: GOOGLE_CLIENT_ID_FILE_${TAG}
+  GOOGLE_CLIENT_SECRET_FILE:
+    external: true
+    name: GOOGLE_CLIENT_SECRET_FILE_${TAG}
+  ADMIN_TOKEN_FILE:
+    external: true
+    name: ADMIN_TOKEN_FILE_${TAG}
+  E2E_PASSWORD_FILE:
+    external: true
+    name: E2E_PASSWORD_FILE_${TAG}
+  OPENAI_API_KEY_FILE:
+    external: true
+    name: OPENAI_API_KEY_FILE_${TAG}
+
+services:
+  traefik:
+    image: traefik:v2.11
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--providers.docker.network=vox_network"
+      - "--entrypoints.web.address=:9081"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+    ports:
+      - "9081:9081"
+      - "7981:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - vox_network
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/POSTGRES_USER_FILE
+      POSTGRES_PASSWORD_FILE: /run/secrets/POSTGRES_PASSWORD_FILE
+      POSTGRES_DB: vox_db
+    secrets:
+      - POSTGRES_USER_FILE
+      - POSTGRES_PASSWORD_FILE
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - vox_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+  migrate:
+    image: ${DOCKER_REGISTRY}/smart-translator:${TAG}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        /app/goose -dir /app/db/migrations postgres \
+          "postgres://$$(cat /run/secrets/POSTGRES_USER_FILE):$$(cat /run/secrets/POSTGRES_PASSWORD_FILE)@db:5432/$$(cat /run/secrets/POSTGRES_DB_NAME_FILE)?sslmode=$$(cat /run/secrets/POSTGRES_SSLMODE_FILE)" \
+          up
+    secrets:
+      - POSTGRES_USER_FILE
+      - POSTGRES_PASSWORD_FILE
+      - POSTGRES_SSLMODE_FILE
+      - POSTGRES_DB_NAME_FILE
+    networks:
+      - vox_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        max_attempts: 10
+        delay: 5s
+      placement:
+        constraints:
+          - node.role == manager
+
+  loki:
+    image: grafana/loki:3.0.0
+    command: -config.file=/etc/loki/local-config.yaml
+    configs:
+      - source: loki_config
+        target: /etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    networks:
+      - vox_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --tries=1 -O- http://localhost:3100/ready || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    ports:
+      - "3001:3001"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/GRAFANA_PASSWORD_FILE
+    secrets:
+      - GRAFANA_PASSWORD_FILE
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - vox_network
+
+  vox:
+    image: ${DOCKER_REGISTRY}/smart-translator:${TAG}
+    # ports removed — traefik handles ingress now
+    environment:
+      PGX_MAX_CONNS: "${PGX_MAX_CONNS}"
+      PGX_MIN_CONNS: "${PGX_MIN_CONNS}"
+      MODE: "${MODE}"
+      LOKI_URL: "http://loki:3100"
+      BASE_URL: "${BASE_URL}"
+      FRONTEND_URL: "${FRONTEND_URL}"
+      GROQ_MODEL: "${GROQ_MODEL}"
+      GROQ_BASE_URL: "${GROQ_BASE_URL}"
+      FISH_AUDIO_BASE_URL: "${FISH_AUDIO_BASE_URL}"
+      DEEPGRAM_BASE_URL: "${DEEPGRAM_BASE_URL}"
+      DEEPGRAM_MODEL: "${DEEPGRAM_MODEL}"
+      GOOGLE_TOKEN_URL: "${GOOGLE_TOKEN_URL}"
+      GH_TOKEN_URL: "${GH_TOKEN_URL}"
+      GOOGLE_USER_INFO_URL: "${GOOGLE_USER_INFO_URL}"
+      GH_USER_INFO_URL: "${GH_USER_INFO_URL}"
+      STORAGE_PATH: "${STORAGE_PATH}"
+      JWT_SECRET_FILE: /run/secrets/JWT_SECRET_FILE
+      GROQ_API_KEY_FILE: /run/secrets/GROQ_API_KEY_FILE
+      FISH_AUDIO_API_KEY_FILE: /run/secrets/FISH_AUDIO_API_KEY_FILE
+      DEEPGRAM_API_KEY_FILE: /run/secrets/DEEPGRAM_API_KEY_FILE
+      GH_CLIENT_ID_FILE: /run/secrets/GH_CLIENT_ID_FILE
+      GH_CLIENT_SECRET_FILE: /run/secrets/GH_CLIENT_SECRET_FILE
+      GOOGLE_CLIENT_ID_FILE: /run/secrets/GOOGLE_CLIENT_ID_FILE
+      GOOGLE_CLIENT_SECRET_FILE: /run/secrets/GOOGLE_CLIENT_SECRET_FILE
+      ADMIN_TOKEN_FILE: /run/secrets/ADMIN_TOKEN_FILE
+      POSTGRES_USER_FILE: /run/secrets/POSTGRES_USER_FILE
+      POSTGRES_PASSWORD_FILE: /run/secrets/POSTGRES_PASSWORD_FILE
+      POSTGRES_HOST_FILE: /run/secrets/POSTGRES_HOST_FILE
+      POSTGRES_PORT_FILE: /run/secrets/POSTGRES_PORT_FILE
+      POSTGRES_DB_NAME_FILE: /run/secrets/POSTGRES_DB_NAME_FILE
+      POSTGRES_SSLMODE_FILE: /run/secrets/POSTGRES_SSLMODE_FILE
+      E2E_LOGIN: "${E2E_LOGIN}"
+      E2E_PASSWORD_FILE: /run/secrets/E2E_PASSWORD_FILE
+      OPENAI_API_KEY_FILE: /run/secrets/OPENAI_API_KEY_FILE
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL}"
+    secrets:
+      - POSTGRES_DB_NAME_FILE
+      - DEEPGRAM_API_KEY_FILE
+      - GROQ_API_KEY_FILE
+      - FISH_AUDIO_API_KEY_FILE
+      - JWT_SECRET_FILE
+      - POSTGRES_USER_FILE
+      - POSTGRES_PASSWORD_FILE
+      - POSTGRES_HOST_FILE
+      - POSTGRES_PORT_FILE
+      - POSTGRES_SSLMODE_FILE
+      - GH_CLIENT_ID_FILE
+      - GH_CLIENT_SECRET_FILE
+      - GOOGLE_CLIENT_ID_FILE
+      - GOOGLE_CLIENT_SECRET_FILE
+      - ADMIN_TOKEN_FILE
+      - E2E_PASSWORD_FILE
+      - OPENAI_API_KEY_FILE
+    volumes:
+      - app_state:/app/data
+    networks:
+      - vox_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.smarttranslator.rule=PathPrefix(`/`)"
+        - "traefik.http.routers.smarttranslator.entrypoints=web"
+        - "traefik.http.services.smarttranslator.loadbalancer.server.port=9081"
+        - "traefik.http.services.smarttranslator.loadbalancer.sticky.cookie=true"
+        - "traefik.http.services.smarttranslator.loadbalancer.sticky.cookie.name=smarttranslator_sticky"
+        - "traefik.http.services.smarttranslator.loadbalancer.sticky.cookie.httpOnly=true"

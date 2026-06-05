@@ -3,12 +3,12 @@ name: API CI
 on:
   push:
     paths:
-      - "vox_api/**"
+      - "smarttranslator_api/**"
       - ".github/workflows/api-ci.yml"
       - ".github/workflows/api-cd.yml"
   pull_request:
     paths:
-      - "vox_api/**"
+      - "smarttranslator_api/**"
       - ".github/workflows/api-ci.yml"
 
 concurrency:
@@ -24,21 +24,21 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: vox_api
+        working-directory: smarttranslator_api
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: vox_api/go.mod
+          go-version-file: smarttranslator_api/go.mod
           cache: true
-          cache-dependency-path: vox_api/go.sum
+          cache-dependency-path: smarttranslator_api/go.sum
 
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.8.0
-          working-directory: vox_api
+          working-directory: smarttranslator_api
 
       - name: Check go mod tidy
         run: |
@@ -51,7 +51,7 @@ jobs:
       - name: Security scan
         uses: golang/govulncheck-action@v1
         with:
-          go-version-file: vox_api/go.mod
+          go-version-file: smarttranslator_api/go.mod
           work-dir: vox_api
 
   unit-tests:
@@ -60,15 +60,15 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: vox_api
+        working-directory: smarttranslator_api
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: vox_api/go.mod
+          go-version-file: smarttranslator_api/go.mod
           cache: true
-          cache-dependency-path: vox_api/go.sum
+          cache-dependency-path: smarttranslator_api/go.sum
 
       - name: Run Unit Tests
         run: go test -race -count=1 -tags=unit -coverprofile=coverage.out ./...
@@ -76,7 +76,7 @@ jobs:
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
-          files: vox_api/coverage.out
+          files: smarttranslator_api/coverage.out
           flags: unit
 
   integration-tests:
@@ -85,15 +85,15 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: vox_api
+        working-directory: smarttranslator_api
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: vox_api/go.mod
+          go-version-file: smarttranslator_api/go.mod
           cache: true
-          cache-dependency-path: vox_api/go.sum
+          cache-dependency-path: smarttranslator_api/go.sum
 
       - name: Run Integration Tests
         run: go test -race -count=1 -tags=integration -timeout 5m ./...

@@ -35,12 +35,12 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: vox_web
-          file: vox_web/docker/prod.Dockerfile
+          context: smarttranslator_web
+          file: smarttranslator_web/docker/prod.Dockerfile
           push: true
-          tags: ${{ secrets.REGISTRY_USER }}/vox-web:${{ env.TAG }}
-          cache-from: type=gha,scope=vox-web-prod
-          cache-to: type=gha,mode=max,scope=vox-web-prod
+          tags: ${{ secrets.REGISTRY_USER }}/smart-translator-web:${{ env.TAG }}
+          cache-from: type=gha,scope=smart-translator-web-prod
+          cache-to: type=gha,mode=max,scope=smart-translator-web-prod
 
       - name: Copy nginx config to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -48,8 +48,8 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "vox_web/docker/docker-compose.yml,vox_web/docker/nginx.conf"
-          target: "~/vox_web/"
+          source: "smarttranslator_web/docker/docker-compose.yml,smarttranslator_web/docker/nginx.conf"
+          target: "~/smarttranslator_web/"
           strip_components: 2
 
       - name: Deploy to VPS
@@ -64,7 +64,7 @@ jobs:
             echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login \
               -u "${{ secrets.REGISTRY_USER }}" --password-stdin
 
-            cd ~/vox_web
+            cd ~/smarttranslator_web
 
             export TAG="${{ env.TAG }}"
             export DOCKER_REGISTRY="${{ secrets.REGISTRY_USER }}"
@@ -75,12 +75,12 @@ jobs:
               --with-registry-auth \
               --prune \
               -c docker-compose.resolved.yml \
-              vox_web_stack
+              smarttranslator_web_stack
 
             docker service update \
               --force \
-              --image ${{ secrets.REGISTRY_USER }}/vox-web:${{ env.TAG }} \
-              vox_web_stack_web
+              --image ${{ secrets.REGISTRY_USER }}/smart-translator-web:${{ env.TAG }} \
+              smarttranslator_web_stack_web
 
             echo "Waiting for web service to stabilize..."
 
@@ -89,10 +89,10 @@ jobs:
 
             until [ $WAIT_COUNT -ge $MAX_WAIT ]; do
               REPLICAS=$(docker service ls \
-                --filter name=vox_web_stack_web \
+                --filter name=smarttranslator_web_stack_web \
                 --format '{{.Replicas}}')
 
-              FAILED=$(docker service ps vox_web_stack_web \
+              FAILED=$(docker service ps smarttranslator_web_stack_web \
                 --filter "desired-state=running" \
                 --no-trunc \
                 --format '{{.CurrentState}}' \
