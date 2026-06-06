@@ -397,13 +397,6 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		return
 	}
 
-	fileID := ctx.Query("file_id")
-	if fileID == "" {
-		log.Error("File ID is missing")
-		ctx.Data(http.StatusBadRequest, mod.APP_JSON, mod.HttpError(mod.INVALID_URL_CODE, mod.INVALID_URL_MSG))
-		return
-	}
-
 	var agent VoiceAgent
 	if builder, ok := ctx.Get("voice_agent_builder"); !ok {
 		log.Error("voice_agent_builder not found in context")

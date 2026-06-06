@@ -54,28 +54,9 @@
       </select>
     </div>
 
-    <div class="field">
-      <label>Voice sample (for TTS)</label>
-      <p v-if="loadingVoice" class="muted">Loading…</p>
-      <p v-else-if="!voiceRefs.length" class="muted">
-        No samples —
-        <RouterLink to="/profile" style="color: #6d5aff">upload one in Profile →</RouterLink>
-      </p>
-      <select v-else v-model="fileId" :disabled="recording">
-        <option v-for="v in voiceRefs" :key="v.file_id" :value="v.file_id">
-          {{ v.text ? v.text.slice(0, 70) : v.file_id.slice(0, 12) + '…' }}
-        </option>
-      </select>
-    </div>
-
     <p v-if="error" class="error" style="margin-bottom: 12px">{{ error }}</p>
 
-    <button
-      v-if="!recording"
-      style="width: 100%"
-      :disabled="!fileId || loadingVoice"
-      @click="start"
-    >
+    <button v-if="!recording" style="width: 100%" @click="start">
       Start Broadcasting
     </button>
     <button v-else class="danger" style="width: 100%" @click="stop">
@@ -89,10 +70,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { voiceApi, hubApi } from '../api'
-import type { VoiceRef } from '../api'
+import { hubApi } from '../api'
 
 const route = useRoute()
 const id = route.params.id as string
@@ -107,26 +87,13 @@ const langName = (code: string) => LANG_NAMES[code] ?? code.toUpperCase()
 
 const lang = ref('ru')
 const outputLang = ref('en')
-const fileId = ref('')
 const recording = ref(false)
 const error = ref('')
 const copied = ref(false)
-const voiceRefs = ref<VoiceRef[]>([])
-const loadingVoice = ref(true)
 
 let ws: WebSocket | null = null
 let mediaRecorder: MediaRecorder | null = null
 let stream: MediaStream | null = null
-
-onMounted(async () => {
-  try {
-    const { data } = await voiceApi.list()
-    voiceRefs.value = data ?? []
-    if (data?.length) fileId.value = data[0].file_id
-  } catch { /* ignore */ } finally {
-    loadingVoice.value = false
-  }
-})
 
 onUnmounted(stop)
 
@@ -139,7 +106,7 @@ async function start() {
     return
   }
 
-  const url = hubApi.publishWsUrl(id, lang.value, outputLang.value, fileId.value)
+  const url = hubApi.publishWsUrl(id, lang.value, outputLang.value)
   ws = new WebSocket(url)
   ws.binaryType = 'arraybuffer'
 
