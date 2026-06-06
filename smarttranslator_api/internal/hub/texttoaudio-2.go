@@ -81,9 +81,6 @@ func (f *OpenAI) Do(ctx context.Context) error {
 
 			s, err := f.NewStream(ctx)
 			if err != nil {
-				if ctx.Err() != nil {
-					return nil
-				}
 				continue
 			}
 
