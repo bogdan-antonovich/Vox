@@ -450,7 +450,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 			Model:       h.Cfg.DeepgramModel,
 			Language:    sourceLang,
 			Channels:    1,
-			Endpointing: "true",
+			Endpointing: "500",
 			Numerals:    true,
 			Punctuate:   true,
 		},
