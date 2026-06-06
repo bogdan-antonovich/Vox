@@ -448,6 +448,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		BaseURL: h.Cfg.DeepgramBaseURL,
 		Options: interfaces.LiveTranscriptionOptions{
 			Model:       h.Cfg.DeepgramModel,
+			Language:    sourceLang,
 			Channels:    1,
 			Endpointing: "true",
 			Numerals:    true,
