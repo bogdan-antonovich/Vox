@@ -334,7 +334,8 @@ func (h *HubAPI) WsUpgrader(ctx *gin.Context) {
 // @Description  Upgrades to WebSocket, receives audio chunks, transcribes via Deepgram, processes via Groq, and synthesizes speech. All operations run concurrently. Requires a valid user and hub in context.
 // @Tags         hub
 // @Param        hub_id  path   string  true  "Hub ID"
-// @Param        lang    query  string  true  "Transcription language code (e.g. en, ru)"
+// @Param        lang    query  string  true  "Source language code (e.g. ru, de)"
+// @Param        to      query  string  false "Target language code (e.g. en, fr); defaults to en"
 // @Param        file_id query  string  true  "File ID to the voice reference"
 // @Success      101  "WebSocket upgrade successful"
 // @Failure      401  {object}  models.HttpErrorResponse  "Missing or invalid auth cookies"
@@ -443,7 +444,11 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		doCloser(conn, log)
 	}()
 
-	targetLang := ctx.Query("lang")
+	sourceLang := ctx.Query("lang")
+	outputLang := ctx.Query("to")
+	if outputLang == "" {
+		outputLang = "en"
+	}
 
 	deepgram := Deepgram{
 		ApiKey:  h.Cfg.DeepgramAPIKey,
@@ -455,7 +460,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 			Numerals:    true,
 			Punctuate:   true,
 		},
-		TargetLang:    targetLang,
+		TargetLang:    sourceLang,
 		transcription: transcription,
 		errors:        deepgramErrors,
 		log:           log,
@@ -466,7 +471,8 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		ApiKey:        h.Cfg.GroqAPIKey,
 		Model:         h.Cfg.GroqModel,
 		BaseURL:       h.Cfg.GroqBaseURL,
-		TargetLang:    targetLang,
+		SourceLang:    sourceLang,
+		OutputLang:    outputLang,
 		transcription: transcription,
 		errors:        groqErrors,
 		tokens:        tokens,

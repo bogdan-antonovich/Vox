@@ -12,11 +12,27 @@ type Groq struct {
 	ApiKey        string
 	Model         string
 	BaseURL       string
-	TargetLang    string
+	SourceLang    string
+	OutputLang    string
 	transcription *StringChan
 	tokens        *StringChan
 	errors        *ErrorChan
 	log           *zap.Logger
+}
+
+var langNames = map[string]string{
+	"en": "English", "ru": "Russian", "uk": "Ukrainian",
+	"de": "German", "fr": "French", "es": "Spanish",
+	"zh": "Chinese", "ja": "Japanese", "ar": "Arabic",
+	"pt": "Portuguese", "it": "Italian", "ko": "Korean",
+	"pl": "Polish", "nl": "Dutch", "tr": "Turkish",
+}
+
+func langName(code string) string {
+	if name, ok := langNames[code]; ok {
+		return name
+	}
+	return code
 }
 
 // func (g *Groq) handleStream(ctx context.Context, stream *ssestream.Stream[openai.ChatCompletionChunk]) error {
@@ -55,7 +71,7 @@ func (g *Groq) do(ctx context.Context) (err error) {
 			resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 				Model: g.Model,
 				Messages: []openai.ChatCompletionMessageParamUnion{
-					openai.SystemMessage("You are a translator. Translate the following " + g.TargetLang + " text to English. Output only the translation, nothing else."),
+					openai.SystemMessage("You are a translator. Translate the following " + langName(g.SourceLang) + " text to " + langName(g.OutputLang) + ". Output only the translation, nothing else."),
 					openai.UserMessage(transcript),
 				},
 			})

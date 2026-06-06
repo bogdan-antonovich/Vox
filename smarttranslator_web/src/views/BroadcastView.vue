@@ -14,7 +14,7 @@
     </div>
 
     <div class="field">
-      <label>Listen and translate only</label>
+      <label>Source language</label>
       <select v-model="lang" :disabled="recording">
         <option value="ru">Russian</option>
         <option value="uk">Ukrainian</option>
@@ -24,6 +24,33 @@
         <option value="zh">Chinese</option>
         <option value="ja">Japanese</option>
         <option value="ar">Arabic</option>
+        <option value="pt">Portuguese</option>
+        <option value="it">Italian</option>
+        <option value="ko">Korean</option>
+        <option value="pl">Polish</option>
+        <option value="nl">Dutch</option>
+        <option value="tr">Turkish</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Translate to</label>
+      <select v-model="outputLang" :disabled="recording">
+        <option value="en">English</option>
+        <option value="ru">Russian</option>
+        <option value="uk">Ukrainian</option>
+        <option value="de">German</option>
+        <option value="fr">French</option>
+        <option value="es">Spanish</option>
+        <option value="zh">Chinese</option>
+        <option value="ja">Japanese</option>
+        <option value="ar">Arabic</option>
+        <option value="pt">Portuguese</option>
+        <option value="it">Italian</option>
+        <option value="ko">Korean</option>
+        <option value="pl">Polish</option>
+        <option value="nl">Dutch</option>
+        <option value="tr">Turkish</option>
       </select>
     </div>
 
@@ -56,7 +83,7 @@
     </button>
 
     <p class="muted" style="margin-top: 10px">
-      {{ recording ? '● Live — translating to English' : 'Translates speech to English in real time' }}
+      {{ recording ? `● Live — translating to ${langName(outputLang)}` : 'Ready to broadcast' }}
     </p>
   </div>
 </template>
@@ -70,7 +97,16 @@ import type { VoiceRef } from '../api'
 const route = useRoute()
 const id = route.params.id as string
 
+const LANG_NAMES: Record<string, string> = {
+  en: 'English', ru: 'Russian', uk: 'Ukrainian', de: 'German',
+  fr: 'French', es: 'Spanish', zh: 'Chinese', ja: 'Japanese',
+  ar: 'Arabic', pt: 'Portuguese', it: 'Italian', ko: 'Korean',
+  pl: 'Polish', nl: 'Dutch', tr: 'Turkish',
+}
+const langName = (code: string) => LANG_NAMES[code] ?? code.toUpperCase()
+
 const lang = ref('ru')
+const outputLang = ref('en')
 const fileId = ref('')
 const recording = ref(false)
 const error = ref('')
@@ -103,7 +139,7 @@ async function start() {
     return
   }
 
-  const url = hubApi.publishWsUrl(id, lang.value, fileId.value)
+  const url = hubApi.publishWsUrl(id, lang.value, outputLang.value, fileId.value)
   ws = new WebSocket(url)
   ws.binaryType = 'arraybuffer'
 

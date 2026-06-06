@@ -24,8 +24,8 @@ export const hubApi = {
   create:   () => client.post<{ hub_id: string }>('/hub'),
   remove:   (id: string) => client.delete(`/hub/${id}`),
   listenUrl: (id: string) => `${BASE}/hub/${id}/listen`,
-  publishWsUrl: (id: string, lang: string, fileId: string) =>
-    `${WS_BASE}/hub/${id}/publish?lang=${lang}&file_id=${fileId}`,
+  publishWsUrl: (id: string, lang: string, to: string, fileId: string) =>
+    `${WS_BASE}/hub/${id}/publish?lang=${lang}&to=${to}&file_id=${fileId}`,
 }
 
 export const voiceApi = {
