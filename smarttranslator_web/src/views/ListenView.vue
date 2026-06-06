@@ -48,9 +48,6 @@ const listening = ref(false)
 const error = ref('')
 const audioEl = ref<HTMLAudioElement | null>(null)
 
-let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-let objectUrl = ''
-
 onMounted(() => {
   if (inputId.value) void connect()
 })
@@ -62,12 +59,11 @@ async function connect() {
   if (!hubId) return
   error.value = ''
 
-  let response: Response
   try {
-    response = await fetch(hubApi.listenUrl(hubId))
-    if (!response.ok || !response.body) throw new Error('bad response')
-  } catch {
-    error.value = 'Could not connect. Check the hub ID and try again.'
+    const res = await fetch(hubApi.listenUrl(hubId), { method: 'HEAD' })
+    if (!res.ok) throw new Error(String(res.status))
+  } catch (e) {
+    error.value = `Could not connect (${(e as Error).message}). Check the hub ID.`
     return
   }
 
@@ -75,42 +71,15 @@ async function connect() {
   listening.value = true
   await nextTick()
 
-  const ms = new MediaSource()
-  objectUrl = URL.createObjectURL(ms)
-  audioEl.value!.src = objectUrl
-
-  ms.addEventListener('sourceopen', () => {
-    const sb = ms.addSourceBuffer('audio/mpeg')
-    reader = response.body!.getReader()
-
-    const pump = async () => {
-      for (;;) {
-        const { done, value } = await reader!.read()
-        if (done) break
-        if (sb.updating) {
-          await new Promise<void>(r => sb.addEventListener('updateend', () => r(), { once: true }))
-        }
-        sb.appendBuffer(value.buffer as ArrayBuffer)
-      }
-    }
-
-    pump().catch(() => {})
-  })
-
+  audioEl.value!.src = hubApi.listenUrl(hubId)
   audioEl.value!.play().catch(() => {})
 }
 
 function disconnect() {
-  reader?.cancel()
   if (audioEl.value) {
     audioEl.value.pause()
     audioEl.value.src = ''
   }
-  if (objectUrl) {
-    URL.revokeObjectURL(objectUrl)
-    objectUrl = ''
-  }
-  reader = null
   listening.value = false
 }
 </script>
