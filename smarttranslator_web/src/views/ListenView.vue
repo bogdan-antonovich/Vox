@@ -59,20 +59,18 @@ async function connect() {
   if (!hubId) return
   error.value = ''
 
-  try {
-    const res = await fetch(hubApi.listenUrl(hubId), { method: 'HEAD' })
-    if (!res.ok) throw new Error(String(res.status))
-  } catch (e) {
-    error.value = `Could not connect (${(e as Error).message}). Check the hub ID.`
-    return
-  }
-
   activeId.value = hubId
   listening.value = true
   await nextTick()
 
-  audioEl.value!.src = hubApi.listenUrl(hubId)
-  audioEl.value!.play().catch(() => {})
+  const el = audioEl.value!
+  el.onerror = () => {
+    error.value = 'Could not connect. Check the hub ID.'
+    listening.value = false
+    activeId.value = ''
+  }
+  el.src = hubApi.listenUrl(hubId)
+  el.play().catch(() => {})
 }
 
 function disconnect() {
