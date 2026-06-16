@@ -2,11 +2,16 @@ package hub
 
 import (
 	"context"
+	"time"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"go.uber.org/zap"
 )
+
+// translationRequestTimeout bounds a single translation request so a stalled
+// call cannot block the pipeline indefinitely.
+const translationRequestTimeout = 10 * time.Second
 
 type Groq struct {
 	ApiKey        string
@@ -68,16 +73,23 @@ func (g *Groq) do(ctx context.Context) (err error) {
 				return nil
 			}
 			g.log.Debug("Groq got transcript", zap.String("transcript", transcript))
-			resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+			reqCtx, cancel := context.WithTimeout(ctx, translationRequestTimeout)
+			resp, err := client.Chat.Completions.New(reqCtx, openai.ChatCompletionNewParams{
 				Model: g.Model,
 				Messages: []openai.ChatCompletionMessageParamUnion{
 					openai.SystemMessage("You are a translator. Translate the following " + langName(g.SourceLang) + " text to " + langName(g.OutputLang) + ". Output only the translation, nothing else."),
 					openai.UserMessage(transcript),
 				},
 			})
+			cancel()
 			if err != nil {
+				// Skip this segment instead of tearing down the pipeline so a
+				// single stalled/failed translation doesn't stop the broadcast.
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				g.log.Error("Groq completion error", zap.Error(err))
-				return err
+				continue
 			}
 			if len(resp.Choices) > 0 {
 				content := resp.Choices[0].Message.Content

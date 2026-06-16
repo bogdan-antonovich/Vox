@@ -4,13 +4,19 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/openai/openai-go"
 	"go.uber.org/zap"
 )
 
+// ttsRequestTimeout bounds a single OpenAI TTS request so a stalled call cannot
+// block the VoiceAgent goroutine (and, via backpressure, the whole pipeline).
+const ttsRequestTimeout = 10 * time.Second
+
 type OpenAIStream struct {
 	reader io.ReadCloser
+	cancel context.CancelFunc
 	chunk  []byte
 	err    error
 }
@@ -31,7 +37,13 @@ func (s *OpenAIStream) Next() bool {
 
 func (s *OpenAIStream) Bytes() []byte              { return s.chunk }
 func (s *OpenAIStream) Err() error                 { return s.err }
-func (s *OpenAIStream) Close() error               { return s.reader.Close() }
+func (s *OpenAIStream) Close() error {
+	err := s.reader.Close()
+	if s.cancel != nil {
+		s.cancel()
+	}
+	return err
+}
 func (s *OpenAIStream) Read(p []byte) (int, error) { return s.reader.Read(p) }
 func (s *OpenAIStream) Collect() ([]byte, error)   { return io.ReadAll(s.reader) }
 
@@ -53,20 +65,23 @@ func (f *OpenAI) Handle(ctx context.Context, s Stream) error {
 }
 
 func (f *OpenAI) NewStream(ctx context.Context) (s Stream, err error) {
-	// I dont care
 	f.log.Debug("OpenAI.NewStream", zap.Bool("ctx_is_nil", ctx == nil))
-	response, err := f.client.Audio.Speech.New(ctx, openai.AudioSpeechNewParams{ //nolint:bodyclose
+	// Bound the whole TTS request+stream lifetime so a stalled call cannot block
+	// the goroutine forever. cancel is released when the stream is closed.
+	reqCtx, cancel := context.WithTimeout(ctx, ttsRequestTimeout)
+	response, err := f.client.Audio.Speech.New(reqCtx, openai.AudioSpeechNewParams{ //nolint:bodyclose
 		Model:          openai.SpeechModelTTS1,
 		Voice:          openai.AudioSpeechNewParamsVoiceAlloy,
 		Input:          f.text,
 		ResponseFormat: openai.AudioSpeechNewParamsResponseFormatMP3,
 	})
 	if err != nil {
+		cancel()
 		f.log.Error("Failed to stream TTS", zap.Error(err))
 		return
 	}
 
-	return &OpenAIStream{reader: response.Body}, nil
+	return &OpenAIStream{reader: response.Body, cancel: cancel}, nil
 }
 
 func (f *OpenAI) Do(ctx context.Context) error {
