@@ -492,7 +492,21 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		for {
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
-				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				// A broadcaster going away — cleanly (1000/1001) or abruptly
+				// (1005 no-status, 1006 abnormal, both typical for a browser
+				// closing the socket) — is the normal end of a publish session,
+				// not a pipeline failure. Return nil so the audio pipe closes
+				// gracefully: Deepgram EOFs, transcription closes, and the
+				// validator flushes its buffered sentence so the final
+				// translation is still spoken. Returning err instead would
+				// cancel the errgroup and drop that in-flight audio.
+				if websocket.IsCloseError(err,
+					websocket.CloseNormalClosure,
+					websocket.CloseGoingAway,
+					websocket.CloseNoStatusReceived,
+					websocket.CloseAbnormalClosure,
+				) {
+					log.Debug("Publish WebSocket closed by client", zap.Error(err))
 					return nil
 				}
 				log.Error("WebSocket read error", zap.Error(err))
