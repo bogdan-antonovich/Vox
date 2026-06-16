@@ -3,9 +3,9 @@ package hub
 import (
 	"io"
 	"net/http"
-	"strings"
 	"smarttranslator/pkg/helpers"
 	mod "smarttranslator/pkg/models"
+	"strings"
 
 	interfaces "github.com/deepgram/deepgram-go-sdk/v3/pkg/client/interfaces"
 	fishaudio "github.com/fishaudio/fish-audio-go"
@@ -346,7 +346,8 @@ func (h *HubAPI) WsUpgrader(ctx *gin.Context) {
 func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 	log := mod.GetLogger(ctx)
 	transcription := NewStringChanBuf(1)
-	tokens := NewStringChanBuf(1)
+	tokens := NewStringChanBuf(1)    // Groq translation -> Validator
+	validated := NewStringChanBuf(1) // Validator (complete thoughts) -> VoiceAgent
 	groqErrors := NewErrorChanBuf(1)
 	deepgramErrors := NewErrorChanBuf(1)
 
@@ -406,7 +407,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		switch bldr := builder.(type) {
 		case VoiceAgentBuilder:
 			bldr.SetHub(hub)
-			bldr.SetTokens(tokens)
+			bldr.SetTokens(validated)
 			bldr.SetLogger(log)
 			agent = bldr.Get()
 		default:
@@ -473,6 +474,16 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		log:           log,
 	}
 
+	validator := Validator{
+		ApiKey:     h.Cfg.GroqAPIKey,
+		Model:      h.Cfg.GroqModel,
+		BaseURL:    h.Cfg.GroqBaseURL,
+		OutputLang: outputLang,
+		tokens:     tokens,
+		validated:  validated,
+		log:        log,
+	}
+
 	g.Go(func() error {
 		defer doCloser(pw, log)
 		for {
@@ -494,6 +505,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 
 	g.Go(func() error { defer transcription.Close(); return deepgram.do(pr) })
 	g.Go(func() error { defer tokens.Close(); return groq.do(gctx) })
+	g.Go(func() error { defer validated.Close(); return validator.do(gctx) })
 	g.Go(func() error { return agent.Do(gctx) })
 
 	if err := g.Wait(); err != nil {
@@ -501,6 +513,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		deepgramErrors.Close()
 		groqErrors.Close()
 		tokens.Close()
+		validated.Close()
 		log.Error("Publishing pipeline error", zap.Error(err))
 		return
 	}

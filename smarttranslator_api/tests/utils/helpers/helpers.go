@@ -12,9 +12,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"strings"
-	"testing"
-	"time"
 	"smarttranslator/internal/admin/logs"
 	"smarttranslator/internal/auth"
 	"smarttranslator/internal/hub"
@@ -22,6 +19,9 @@ import (
 	"smarttranslator/internal/user/voice"
 	"smarttranslator/tests/utils/mocks"
 	"smarttranslator/tests/utils/vars"
+	"strings"
+	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -485,6 +485,50 @@ func NewMockGroqServer(t *testing.T, content string) *httptest.Server {
 
 		_, _ = w.Write([]byte("data: [DONE]\n\n"))
 		flusher.Flush()
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// NewMockTranslateAndValidateServer serves the OpenAI-compatible chat endpoint
+// used by BOTH the Groq translator and the Validator (they share GroqBaseURL).
+// It branches on the system prompt: a segmentation request (the Validator) gets
+// back a JSON {complete,remainder} payload; everything else (the translator)
+// gets back the plain translation string. Responses are non-streaming JSON,
+// which is what hub.Groq.do and hub.Validator.do actually decode.
+func NewMockTranslateAndValidateServer(t *testing.T, translation string, complete []string, remainder string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "chat/completions") {
+			http.NotFound(w, r)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		isSegmentation := strings.Contains(string(body), "segmentation")
+
+		var content string
+		if isSegmentation {
+			seg := map[string]any{"complete": complete, "remainder": remainder}
+			data, _ := json.Marshal(seg)
+			content = string(data)
+		} else {
+			content = translation
+		}
+
+		resp := map[string]any{
+			"id":     "chatcmpl-test",
+			"object": "chat.completion",
+			"model":  "test-model",
+			"choices": []map[string]any{
+				{
+					"index":         0,
+					"finish_reason": "stop",
+					"message":       map[string]string{"role": "assistant", "content": content},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	t.Cleanup(srv.Close)
 	return srv

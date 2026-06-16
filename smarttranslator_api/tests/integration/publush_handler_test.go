@@ -396,6 +396,72 @@ func TestPublishHandler_HappyPath_AudioChunkReachesHubConsumer(t *testing.T) {
 	}
 }
 
+// TestPublishHandler_ValidatorForwardsCompleteThoughts drives a real transcript
+// through Deepgram -> Groq -> Validator -> (echo) voice agent and asserts that
+// the validator forwards a complete thought immediately and flushes the buffered
+// remainder when the stream ends — in order (FIFO).
+func TestPublishHandler_ValidatorForwardsCompleteThoughts(t *testing.T) {
+	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
+	// Cyrillic transcript so it passes the lang=ru script filter and reaches Groq.
+	dgSrv := helpers.NewMockDeepgramServer(t, "привет мир")
+	llmSrv := helpers.NewMockTranslateAndValidateServer(t,
+		"Hello there. How are you", // translation returned to Groq
+		[]string{"Hello there."},   // complete thoughts returned to Validator
+		"How are you",              // remainder kept then flushed on close
+	)
+	mgr := hub.NewManager()
+	hubID := mgr.New()
+	h, _ := mgr.Get(hubID)
+	consumer, ch := helpers.NewConsumer(h)
+	defer h.RemoveConsumer(consumer.ID)
+	received := make(chan []byte, 16)
+	go func() {
+		for chunk := range ch {
+			received <- chunk
+		}
+	}()
+	api := &hub.HubAPI{
+		MGR: mgr,
+		Cfg: vars.CfgWithMocks(dgSrv, llmSrv, nil),
+		DB:  helpers.HappyHubDB(refFile, "mp3", "reference text"),
+	}
+	cache := hub.NewHostAndHubs()
+	r := helpers.NewPublishRouterFull(t, api, h, uuid.New().String(), cache, mocks.NewEchoVoiceAgentBuilder())
+
+	srv := httptest.NewServer(r)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/hub/" + hubID + "/publish?lang=ru&file_id=12345"
+	ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio"))
+	require.NoError(t, err)
+
+	err = ws.WriteMessage(websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	require.NoError(t, err)
+
+	for {
+		if _, _, err := ws.ReadMessage(); err != nil {
+			break
+		}
+	}
+
+	readChunk := func() []byte {
+		select {
+		case c := <-received:
+			return c
+		case <-time.After(2 * time.Second):
+			t.Fatal("validator output never reached the hub consumer")
+			return nil
+		}
+	}
+
+	assert.Equal(t, []byte("Hello there."), readChunk())
+	assert.Equal(t, []byte("How are you"), readChunk())
+}
+
 func TestPublishHandler_DeepgramUnreachable(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
 	deadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))

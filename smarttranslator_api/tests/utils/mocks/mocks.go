@@ -172,6 +172,49 @@ func HappyVoiceAgentBuilder() *MockVoiceAgentBuilder {
 	}
 }
 
+// EchoVoiceAgent publishes every token it receives (the validated complete
+// thoughts) to the hub as raw bytes, so tests can assert exactly what the
+// validator forwarded downstream.
+type EchoVoiceAgent struct {
+	tokens *hub.StringChan
+	hub    *hub.Hub
+}
+
+func (m *EchoVoiceAgent) NewStream(ctx context.Context) (hub.Stream, error)   { return nil, nil }
+func (m *EchoVoiceAgent) Handle(ctx context.Context, stream hub.Stream) error { return nil }
+func (m *EchoVoiceAgent) Do(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case tok, ok := <-m.tokens.Ch:
+			if !ok {
+				return nil
+			}
+			if m.hub != nil {
+				m.hub.Publish([]byte(tok))
+			}
+		}
+	}
+}
+
+type EchoVoiceAgentBuilder struct {
+	tokens *hub.StringChan
+	hub    *hub.Hub
+}
+
+func (m *EchoVoiceAgentBuilder) SetReference(audio []byte, text string) {}
+func (m *EchoVoiceAgentBuilder) SetHub(h *hub.Hub)                      { m.hub = h }
+func (m *EchoVoiceAgentBuilder) SetTokens(tokens *hub.StringChan)       { m.tokens = tokens }
+func (m *EchoVoiceAgentBuilder) SetLogger(log *zap.Logger)              {}
+func (m *EchoVoiceAgentBuilder) Get() hub.VoiceAgent {
+	return &EchoVoiceAgent{tokens: m.tokens, hub: m.hub}
+}
+
+func NewEchoVoiceAgentBuilder() *EchoVoiceAgentBuilder {
+	return &EchoVoiceAgentBuilder{}
+}
+
 func ErrorVoiceAgentBuilder() *MockVoiceAgentBuilder {
 	return &MockVoiceAgentBuilder{
 		DoFunc: func(ctx context.Context) error {
