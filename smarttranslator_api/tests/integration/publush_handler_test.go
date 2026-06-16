@@ -397,17 +397,18 @@ func TestPublishHandler_HappyPath_AudioChunkReachesHubConsumer(t *testing.T) {
 }
 
 // TestPublishHandler_ValidatorForwardsCompleteThoughts drives a real transcript
-// through Deepgram -> Groq -> Validator -> (echo) voice agent and asserts that
+// through Deepgram -> Validator -> Groq -> (echo) voice agent and asserts that
 // the validator forwards a complete thought immediately and flushes the buffered
-// remainder when the stream ends — in order (FIFO).
+// remainder when the stream ends — in order (FIFO). The mock translator echoes
+// each thought back, so what reaches the consumer is exactly what the validator
+// segmented (after passing through translation).
 func TestPublishHandler_ValidatorForwardsCompleteThoughts(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-	// Cyrillic transcript so it passes the lang=ru script filter and reaches Groq.
+	// Cyrillic transcript so it passes the lang=ru script filter and reaches the validator.
 	dgSrv := helpers.NewMockDeepgramServer(t, "привет мир")
-	llmSrv := helpers.NewMockTranslateAndValidateServer(t,
-		"Hello there. How are you", // translation returned to Groq
-		[]string{"Hello there."},   // complete thoughts returned to Validator
-		"How are you",              // remainder kept then flushed on close
+	llmSrv := helpers.NewMockSegmentAndTranslateServer(t,
+		[]string{"Welcome to us."},     // complete thoughts returned to Validator
+		"The main news of the weekend", // remainder kept then flushed on close
 	)
 	mgr := hub.NewManager()
 	hubID := mgr.New()
@@ -458,8 +459,8 @@ func TestPublishHandler_ValidatorForwardsCompleteThoughts(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, []byte("Hello there."), readChunk())
-	assert.Equal(t, []byte("How are you"), readChunk())
+	assert.Equal(t, []byte("Welcome to us."), readChunk())
+	assert.Equal(t, []byte("The main news of the weekend"), readChunk())
 }
 
 func TestPublishHandler_DeepgramUnreachable(t *testing.T) {

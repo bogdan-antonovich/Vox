@@ -490,13 +490,41 @@ func NewMockGroqServer(t *testing.T, content string) *httptest.Server {
 	return srv
 }
 
-// NewMockTranslateAndValidateServer serves the OpenAI-compatible chat endpoint
-// used by BOTH the Groq translator and the Validator (they share GroqBaseURL).
-// It branches on the system prompt: a segmentation request (the Validator) gets
-// back a JSON {complete,remainder} payload; everything else (the translator)
-// gets back the plain translation string. Responses are non-streaming JSON,
-// which is what hub.Groq.do and hub.Validator.do actually decode.
-func NewMockTranslateAndValidateServer(t *testing.T, translation string, complete []string, remainder string) *httptest.Server {
+// lastUserMessage extracts the content of the last "user" role message from an
+// OpenAI-compatible chat completion request body.
+func lastUserMessage(body []byte) string {
+	var req struct {
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return ""
+	}
+	content := ""
+	for _, m := range req.Messages {
+		if m.Role == "user" {
+			content = m.Content
+		}
+	}
+	return content
+}
+
+// NewMockSegmentAndTranslateServer serves the OpenAI-compatible chat endpoint
+// used by BOTH the Validator and the Groq translator (they share GroqBaseURL).
+// It branches on the system prompt:
+//
+//   - A segmentation request (the Validator, which runs first on the raw source
+//     transcript) gets back a JSON {complete,remainder} payload built from the
+//     configured split.
+//   - A translation request (Groq, which runs on each complete thought) echoes
+//     back the user message verbatim, so a thought translates to itself and the
+//     test can assert that each segmented thought flowed through in order.
+//
+// Responses are non-streaming JSON, which is what hub.Validator.do and
+// hub.Groq.do actually decode.
+func NewMockSegmentAndTranslateServer(t *testing.T, complete []string, remainder string) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.URL.Path, "chat/completions") {
@@ -512,7 +540,7 @@ func NewMockTranslateAndValidateServer(t *testing.T, translation string, complet
 			data, _ := json.Marshal(seg)
 			content = string(data)
 		} else {
-			content = translation
+			content = lastUserMessage(body)
 		}
 
 		resp := map[string]any{

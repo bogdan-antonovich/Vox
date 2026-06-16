@@ -63,13 +63,13 @@ func newTestValidator(t *testing.T, baseURL string) (*Validator, *StringChan, *S
 	in := NewStringChanBuf(8)
 	out := NewStringChanBuf(8)
 	v := &Validator{
-		ApiKey:     "test-key",
-		Model:      "test-model",
-		BaseURL:    baseURL,
-		OutputLang: "en",
-		tokens:     in,
-		validated:  out,
-		log:        zap.NewNop(),
+		ApiKey:    "test-key",
+		Model:     "test-model",
+		BaseURL:   baseURL,
+		Lang:      "en",
+		tokens:    in,
+		validated: out,
+		log:       zap.NewNop(),
 	}
 	return v, in, out
 }

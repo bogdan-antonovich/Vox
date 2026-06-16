@@ -345,9 +345,9 @@ func (h *HubAPI) WsUpgrader(ctx *gin.Context) {
 // @Router       /hub/{hub_id}/publish [get]
 func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 	log := mod.GetLogger(ctx)
-	transcription := NewStringChanBuf(1)
-	tokens := NewStringChanBuf(1)    // Groq translation -> Validator
-	validated := NewStringChanBuf(1) // Validator (complete thoughts) -> VoiceAgent
+	transcription := NewStringChanBuf(1) // Deepgram -> Validator
+	thoughts := NewStringChanBuf(1)      // Validator (complete source thoughts) -> Groq
+	tokens := NewStringChanBuf(1)        // Groq translation -> VoiceAgent
 	groqErrors := NewErrorChanBuf(1)
 	deepgramErrors := NewErrorChanBuf(1)
 
@@ -407,7 +407,7 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		switch bldr := builder.(type) {
 		case VoiceAgentBuilder:
 			bldr.SetHub(hub)
-			bldr.SetTokens(validated)
+			bldr.SetTokens(tokens)
 			bldr.SetLogger(log)
 			agent = bldr.Get()
 		default:
@@ -448,10 +448,13 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		ApiKey:  h.Cfg.DeepgramAPIKey,
 		BaseURL: h.Cfg.DeepgramBaseURL,
 		Options: interfaces.LiveTranscriptionOptions{
-			Model:       h.Cfg.DeepgramModel,
-			Language:    sourceLang,
-			Channels:    1,
-			Endpointing: "500",
+			Model:    h.Cfg.DeepgramModel,
+			Language: sourceLang,
+			Channels: 1,
+			// Emit finalized words as fast as possible — the Validator now owns
+			// thought-boundary detection, so we don't rely on Deepgram waiting
+			// out a long silence before finalizing a segment.
+			Endpointing: "100",
 			Numerals:    true,
 			Punctuate:   true,
 		},
@@ -462,26 +465,26 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 		ctx:           gctx,
 	}
 
+	validator := Validator{
+		ApiKey:    h.Cfg.GroqAPIKey,
+		Model:     h.Cfg.GroqModel,
+		BaseURL:   h.Cfg.GroqBaseURL,
+		Lang:      sourceLang,
+		tokens:    transcription, // input: raw transcript from Deepgram
+		validated: thoughts,      // output: complete source thoughts for Groq
+		log:       log,
+	}
+
 	groq := Groq{
 		ApiKey:        h.Cfg.GroqAPIKey,
 		Model:         h.Cfg.GroqModel,
 		BaseURL:       h.Cfg.GroqBaseURL,
 		SourceLang:    sourceLang,
 		OutputLang:    outputLang,
-		transcription: transcription,
+		transcription: thoughts, // input: complete source thoughts from Validator
 		errors:        groqErrors,
 		tokens:        tokens,
 		log:           log,
-	}
-
-	validator := Validator{
-		ApiKey:     h.Cfg.GroqAPIKey,
-		Model:      h.Cfg.GroqModel,
-		BaseURL:    h.Cfg.GroqBaseURL,
-		OutputLang: outputLang,
-		tokens:     tokens,
-		validated:  validated,
-		log:        log,
 	}
 
 	g.Go(func() error {
@@ -504,16 +507,16 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 	})
 
 	g.Go(func() error { defer transcription.Close(); return deepgram.do(pr) })
+	g.Go(func() error { defer thoughts.Close(); return validator.do(gctx) })
 	g.Go(func() error { defer tokens.Close(); return groq.do(gctx) })
-	g.Go(func() error { defer validated.Close(); return validator.do(gctx) })
 	g.Go(func() error { return agent.Do(gctx) })
 
 	if err := g.Wait(); err != nil {
 		transcription.Close()
 		deepgramErrors.Close()
 		groqErrors.Close()
+		thoughts.Close()
 		tokens.Close()
-		validated.Close()
 		log.Error("Publishing pipeline error", zap.Error(err))
 		return
 	}
