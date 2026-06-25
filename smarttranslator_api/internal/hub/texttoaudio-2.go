@@ -35,8 +35,8 @@ func (s *OpenAIStream) Next() bool {
 	return false
 }
 
-func (s *OpenAIStream) Bytes() []byte              { return s.chunk }
-func (s *OpenAIStream) Err() error                 { return s.err }
+func (s *OpenAIStream) Bytes() []byte { return s.chunk }
+func (s *OpenAIStream) Err() error    { return s.err }
 func (s *OpenAIStream) Close() error {
 	err := s.reader.Close()
 	if s.cancel != nil {
@@ -74,6 +74,12 @@ func (f *OpenAI) NewStream(ctx context.Context) (s Stream, err error) {
 		Voice:          openai.AudioSpeechNewParamsVoiceAlloy,
 		Input:          f.text,
 		ResponseFormat: openai.AudioSpeechNewParamsResponseFormatMP3,
+		// Stream the audio as it is synthesized instead of waiting for the whole
+		// MP3 to be generated before the first byte arrives. This cuts the
+		// per-sentence TTS first-byte latency that dominated the broadcast lag.
+		// ("audio" streams raw audio chunks and is valid for tts-1; "sse" is not.
+		// For an even lower-latency voice, switch Model to gpt-4o-mini-tts.)
+		StreamFormat: openai.AudioSpeechNewParamsStreamFormatAudio,
 	})
 	if err != nil {
 		cancel()

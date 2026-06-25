@@ -399,17 +399,20 @@ func TestPublishHandler_HappyPath_AudioChunkReachesHubConsumer(t *testing.T) {
 // TestPublishHandler_ValidatorForwardsCompleteThoughts drives a real transcript
 // through Deepgram -> Validator -> Groq -> (echo) voice agent and asserts that
 // the validator forwards a complete thought immediately and flushes the buffered
-// remainder when the stream ends — in order (FIFO). The mock translator echoes
-// each thought back, so what reaches the consumer is exactly what the validator
-// segmented (after passing through translation).
+// remainder when the stream ends — in order (FIFO). The validator now segments on
+// sentence-final punctuation (no LLM call): the first sentence ends with a period
+// so it is emitted at once, while the unpunctuated tail is held and flushed when
+// the stream closes. The mock translator echoes each thought back, so what reaches
+// the consumer is exactly what the validator segmented (after passing through
+// translation).
 func TestPublishHandler_ValidatorForwardsCompleteThoughts(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-	// Cyrillic transcript so it passes the lang=ru script filter and reaches the validator.
-	dgSrv := helpers.NewMockDeepgramServer(t, "привет мир")
-	llmSrv := helpers.NewMockSegmentAndTranslateServer(t,
-		[]string{"Welcome to us."},     // complete thoughts returned to Validator
-		"The main news of the weekend", // remainder kept then flushed on close
-	)
+	// Cyrillic transcript so it passes the lang=ru script filter and reaches the
+	// validator. First sentence is punctuated; the trailing fragment is not.
+	dgSrv := helpers.NewMockDeepgramServer(t, "Добро пожаловать. Главные новости выходных")
+	// The segmentation arguments are unused now that the validator is heuristic;
+	// the server's translation branch still echoes each thought verbatim.
+	llmSrv := helpers.NewMockSegmentAndTranslateServer(t, nil, "")
 	mgr := hub.NewManager()
 	hubID := mgr.New()
 	h, _ := mgr.Get(hubID)
@@ -459,8 +462,8 @@ func TestPublishHandler_ValidatorForwardsCompleteThoughts(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, []byte("Welcome to us."), readChunk())
-	assert.Equal(t, []byte("The main news of the weekend"), readChunk())
+	assert.Equal(t, []byte("Добро пожаловать."), readChunk())
+	assert.Equal(t, []byte("Главные новости выходных"), readChunk())
 }
 
 func TestPublishHandler_DeepgramUnreachable(t *testing.T) {
@@ -494,16 +497,31 @@ func TestPublishHandler_DeepgramUnreachable(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestPublishHandler_GroqUnreachable verifies the pipeline is resilient to an
+// unreachable translator. Groq.do intentionally skips a failed translation
+// instead of tearing down the broadcast (see translation.go), and the validator
+// no longer makes its own LLM call, so an unreachable Groq must NOT kill the
+// session: the connection stays up, simply producing no translated audio, and it
+// shuts down cleanly when the broadcaster disconnects.
 func TestPublishHandler_GroqUnreachable(t *testing.T) {
 	refFile := helpers.WriteTempFile(t, []byte("fake-reference-audio"))
-	// Cyrillic transcript so it passes the lang=ru script filter and actually reaches Groq.
-	dgSrv := helpers.NewMockDeepgramServer(t, "привет мир")
+	// Punctuated Cyrillic transcript: passes the lang=ru filter and the heuristic
+	// validator emits it as a complete thought, so Groq actually gets called.
+	dgSrv := helpers.NewMockDeepgramServer(t, "привет мир.")
 	deadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	deadSrv.Close()
 	fishSrv := helpers.NewMockFishAudioServer(t, []byte("chunk"))
 	mgr := hub.NewManager()
 	hubID := mgr.New()
 	h, _ := mgr.Get(hubID)
+	consumer, ch := helpers.NewConsumer(h)
+	defer h.RemoveConsumer(consumer.ID)
+	received := make(chan []byte, 16)
+	go func() {
+		for chunk := range ch {
+			received <- chunk
+		}
+	}()
 	api := &hub.HubAPI{
 		MGR: mgr,
 		Cfg: vars.CfgWithMocks(dgSrv, deadSrv, fishSrv),
@@ -522,8 +540,22 @@ func TestPublishHandler_GroqUnreachable(t *testing.T) {
 	err = ws.WriteMessage(websocket.BinaryMessage, []byte("fake-audio"))
 	require.NoError(t, err)
 
-	_, _, err = ws.ReadMessage()
-	assert.Error(t, err)
+	// Translation fails, so no audio is ever produced — but the session stays alive.
+	select {
+	case <-received:
+		t.Fatal("no audio should be produced while Groq is unreachable")
+	case <-time.After(750 * time.Millisecond):
+	}
+
+	// A clean client disconnect must still shut the handler down (no hang).
+	err = ws.WriteMessage(websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	require.NoError(t, err)
+	for {
+		if _, _, err := ws.ReadMessage(); err != nil {
+			break
+		}
+	}
 }
 
 func TestPublishHandler_FishAudioUnreachable(t *testing.T) {

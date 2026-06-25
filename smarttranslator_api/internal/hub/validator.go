@@ -2,11 +2,8 @@ package hub
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
-	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
 	"go.uber.org/zap"
 )
 
@@ -17,8 +14,8 @@ import (
 //
 //   - It accumulates raw transcript text from the input channel into an internal
 //     buffer (the "save").
-//   - On every incoming chunk it asks an LLM to split the accumulated text into
-//     complete thoughts plus a trailing incomplete remainder.
+//   - On every incoming chunk it splits the accumulated text into complete
+//     thoughts plus a trailing incomplete remainder.
 //   - Each complete thought is emitted, in original order (FIFO), to the output
 //     channel for translation. A long chunk containing several complete thoughts
 //     is therefore split and delivered as separate, ordered pieces.
@@ -26,6 +23,13 @@ import (
 //     arrives, so the translator never receives a half-finished sentence.
 //   - When the input channel closes, whatever is left in the buffer is flushed
 //     as a final thought.
+//
+// HEURISTIC MODE (active): thought boundaries are detected from sentence-final
+// punctuation, which Deepgram already supplies via its Punctuate option. This
+// replaces the previous LLM round-trip that ran on every Deepgram fragment — see
+// the commented-out implementation at the bottom of this file. To roll back,
+// restore that block and remove the heuristic do/splitThoughts/isSentenceEnd
+// below (and re-add the "encoding/json", openai and option imports).
 type Validator struct {
 	ApiKey    string
 	Model     string
@@ -35,6 +39,125 @@ type Validator struct {
 	validated *StringChan // output: complete source-language thoughts for Groq
 	log       *zap.Logger
 }
+
+// maxBufferedWords bounds how long the heuristic will hold text that never ends
+// on terminal punctuation before flushing it anyway, so a speaker (or an STT
+// model) that fails to emit sentence-final punctuation cannot stall audio
+// indefinitely.
+const maxBufferedWords = 40
+
+// isSentenceEnd reports whether r terminates a sentence. It covers both Latin
+// and common full-width CJK terminators.
+func isSentenceEnd(r rune) bool {
+	switch r {
+	case '.', '!', '?', '…', '。', '！', '？':
+		return true
+	default:
+		return false
+	}
+}
+
+// splitThoughts splits text into complete sentences (each ending in terminal
+// punctuation) and a trailing incomplete remainder. Deepgram's Punctuate option
+// supplies the punctuation, so this stands in for the old per-fragment LLM call
+// at zero latency and zero cost.
+func splitThoughts(text string) (complete []string, remainder string) {
+	var buf strings.Builder
+	for _, r := range text {
+		buf.WriteRune(r)
+		if isSentenceEnd(r) {
+			if s := strings.TrimSpace(buf.String()); s != "" {
+				complete = append(complete, s)
+			}
+			buf.Reset()
+		}
+	}
+	return complete, strings.TrimSpace(buf.String())
+}
+
+func (v *Validator) emit(ctx context.Context, thought string) error {
+	select {
+	case v.validated.Ch <- thought:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (v *Validator) do(ctx context.Context) error {
+	v.log.Debug("Validator.do (heuristic)", zap.Bool("ctx_is_nil", ctx == nil))
+
+	var buffer strings.Builder
+	for {
+		select {
+		case chunk, ok := <-v.tokens.Ch:
+			if !ok {
+				v.log.Debug("Validator input channel closed, flushing buffer")
+				rest := strings.TrimSpace(buffer.String())
+				if rest != "" {
+					if err := v.emit(ctx, rest); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+
+			chunk = strings.TrimSpace(chunk)
+			if chunk == "" {
+				continue
+			}
+			if buffer.Len() > 0 {
+				buffer.WriteString(" ")
+			}
+			buffer.WriteString(chunk)
+
+			text := strings.TrimSpace(buffer.String())
+			complete, remainder := splitThoughts(text)
+
+			// Safety valve: if nothing completed but the buffer has grown large,
+			// flush it anyway so audio keeps flowing without terminal punctuation.
+			if len(complete) == 0 && len(strings.Fields(remainder)) >= maxBufferedWords {
+				complete = []string{remainder}
+				remainder = ""
+			}
+
+			v.log.Debug("Validator segmented text (heuristic)",
+				zap.Strings("complete", complete),
+				zap.String("remainder", remainder))
+
+			for _, thought := range complete {
+				thought = strings.TrimSpace(thought)
+				if thought == "" {
+					continue
+				}
+				if err := v.emit(ctx, thought); err != nil {
+					return err
+				}
+			}
+
+			buffer.Reset()
+			buffer.WriteString(remainder)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+/*
+=============================================================================
+LLM-BASED VALIDATOR (rollback path)
+
+The original implementation asked an LLM to segment each accumulated chunk into
+complete thoughts + a remainder. It was correct but added a full Groq round-trip
+on *every* Deepgram fragment (often several per sentence, most returning nothing
+to translate), which dominated the perceived audio lag. It is preserved verbatim
+below so it can be switched back on.
+
+To restore:
+  1. Delete the heuristic do/splitThoughts/isSentenceEnd/maxBufferedWords above.
+  2. Uncomment everything in this block.
+  3. Re-add these imports: "encoding/json",
+     "github.com/openai/openai-go", "github.com/openai/openai-go/option".
 
 // validatorResult is the JSON contract we ask the segmentation model to honour.
 type validatorResult struct {
@@ -64,15 +187,6 @@ func extractJSON(s string) string {
 		return s
 	}
 	return s[start : end+1]
-}
-
-func (v *Validator) emit(ctx context.Context, thought string) error {
-	select {
-	case v.validated.Ch <- thought:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 // segment asks the model to split text into complete thoughts and a remainder.
@@ -164,3 +278,5 @@ func (v *Validator) do(ctx context.Context) error {
 		}
 	}
 }
+=============================================================================
+*/

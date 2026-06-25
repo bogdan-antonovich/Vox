@@ -1,0 +1,10 @@
+test-audio-ru.mp3
+-----------------
+Source: LibriVox recording of Anton Chekhov's "Человек в футляре"
+        (The Man in a Case), read in Russian.
+Item:   https://archive.org/details/chelovek_2103_librivox
+File:   chelovekvfutliare_04_chekhov_128kb.mp3 (re-encoded to mono 64 kbps)
+
+LibriVox recordings are in the PUBLIC DOMAIN. They are free to use for
+any purpose, including this app's broadcast test feature. No attribution
+is legally required; this note is kept for provenance only.

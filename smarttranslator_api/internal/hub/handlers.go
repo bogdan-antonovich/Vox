@@ -451,9 +451,10 @@ func (h *HubAPI) PublishHandler(ctx *gin.Context) {
 			Model:    h.Cfg.DeepgramModel,
 			Language: sourceLang,
 			Channels: 1,
-			// Emit finalized words as fast as possible — the Validator now owns
-			// thought-boundary detection, so we don't rely on Deepgram waiting
-			// out a long silence before finalizing a segment.
+			// Emit finalized words as fast as possible. The Validator owns
+			// thought-boundary detection (now via sentence-final punctuation, which
+			// Punctuate below supplies), so we don't rely on Deepgram waiting out a
+			// long silence before finalizing a segment.
 			Endpointing: "100",
 			Numerals:    true,
 			Punctuate:   true,

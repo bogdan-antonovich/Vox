@@ -2,70 +2,18 @@ package hub
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"sync"
+	"reflect"
 	"testing"
 	"time"
 
 	"go.uber.org/zap"
 )
 
-// chatResponse builds a minimal non-streaming OpenAI-compatible chat completion
-// body whose assistant message content is the given string.
-func chatResponse(content string) []byte {
-	body := map[string]any{
-		"id":     "chatcmpl-test",
-		"object": "chat.completion",
-		"model":  "test-model",
-		"choices": []map[string]any{
-			{
-				"index":         0,
-				"finish_reason": "stop",
-				"message":       map[string]string{"role": "assistant", "content": content},
-			},
-		},
-	}
-	data, _ := json.Marshal(body)
-	return data
-}
-
-// segResponse marshals a validatorResult into the assistant content payload.
-func segResponse(complete []string, remainder string) string {
-	data, _ := json.Marshal(validatorResult{Complete: complete, Remainder: remainder})
-	return string(data)
-}
-
-// newSegmentationServer returns a server that replies with the supplied contents
-// in order, one per request. Once exhausted it repeats the last entry.
-func newSegmentationServer(t *testing.T, contents []string) *httptest.Server {
-	t.Helper()
-	var mu sync.Mutex
-	idx := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		c := contents[len(contents)-1]
-		if idx < len(contents) {
-			c = contents[idx]
-		}
-		idx++
-		mu.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(chatResponse(c))
-	}))
-	t.Cleanup(srv.Close)
-	return srv
-}
-
-func newTestValidator(t *testing.T, baseURL string) (*Validator, *StringChan, *StringChan) {
+func newTestValidator(t *testing.T) (*Validator, *StringChan, *StringChan) {
 	t.Helper()
 	in := NewStringChanBuf(8)
 	out := NewStringChanBuf(8)
 	v := &Validator{
-		ApiKey:    "test-key",
-		Model:     "test-model",
-		BaseURL:   baseURL,
 		Lang:      "en",
 		tokens:    in,
 		validated: out,
@@ -114,11 +62,35 @@ func runValidator(t *testing.T, v *Validator, out *StringChan, feed func()) []st
 	}
 }
 
+func TestSplitThoughts(t *testing.T) {
+	cases := []struct {
+		name          string
+		in            string
+		wantComplete  []string
+		wantRemainder string
+	}{
+		{"single complete", "Hello world.", []string{"Hello world."}, ""},
+		{"multiple", "One. Two! Three?", []string{"One.", "Two!", "Three?"}, ""},
+		{"trailing remainder", "Done. and more", []string{"Done."}, "and more"},
+		{"no punctuation", "just a fragment", nil, "just a fragment"},
+		{"ellipsis", "Well… maybe.", []string{"Well…", "maybe."}, ""},
+		{"cjk", "你好。", []string{"你好。"}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			complete, remainder := splitThoughts(tc.in)
+			if !reflect.DeepEqual(complete, tc.wantComplete) {
+				t.Fatalf("complete = %#v, want %#v", complete, tc.wantComplete)
+			}
+			if remainder != tc.wantRemainder {
+				t.Fatalf("remainder = %q, want %q", remainder, tc.wantRemainder)
+			}
+		})
+	}
+}
+
 func TestValidator_SplitsMultipleThoughtsInOrder(t *testing.T) {
-	srv := newSegmentationServer(t, []string{
-		segResponse([]string{"First thought.", "Second thought."}, "trailing piece"),
-	})
-	v, in, out := newTestValidator(t, srv.URL)
+	v, in, out := newTestValidator(t)
 
 	got := runValidator(t, v, out, func() {
 		in.Ch <- "First thought. Second thought. trailing piece"
@@ -126,40 +98,28 @@ func TestValidator_SplitsMultipleThoughtsInOrder(t *testing.T) {
 	})
 
 	want := []string{"First thought.", "Second thought.", "trailing piece"}
-	if len(got) != len(want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("order mismatch at %d: got %q want %q (full %v)", i, got[i], want[i], got)
-		}
 	}
 }
 
 func TestValidator_BuffersIncompleteUntilComplete(t *testing.T) {
-	srv := newSegmentationServer(t, []string{
-		segResponse(nil, "Hello"),                 // first chunk: nothing complete yet
-		segResponse([]string{"Hello world."}, ""), // after second chunk: complete
-	})
-	v, in, out := newTestValidator(t, srv.URL)
+	v, in, out := newTestValidator(t)
 
 	got := runValidator(t, v, out, func() {
-		in.Ch <- "Hello"
-		in.Ch <- "world."
+		in.Ch <- "Hello"  // no terminal punctuation: held
+		in.Ch <- "world." // completes the sentence
 		in.Close()
 	})
 
 	want := []string{"Hello world."}
-	if len(got) != 1 || got[0] != want[0] {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
 
 func TestValidator_FlushesRemainderOnClose(t *testing.T) {
-	srv := newSegmentationServer(t, []string{
-		segResponse(nil, "A dangling tail"),
-	})
-	v, in, out := newTestValidator(t, srv.URL)
+	v, in, out := newTestValidator(t)
 
 	got := runValidator(t, v, out, func() {
 		in.Ch <- "A dangling tail"
@@ -171,25 +131,8 @@ func TestValidator_FlushesRemainderOnClose(t *testing.T) {
 	}
 }
 
-func TestValidator_NonJSONResponseForwardsWholeText(t *testing.T) {
-	srv := newSegmentationServer(t, []string{"this is not json at all"})
-	v, in, out := newTestValidator(t, srv.URL)
-
-	got := runValidator(t, v, out, func() {
-		in.Ch <- "some translated text"
-		in.Close()
-	})
-
-	if len(got) != 1 || got[0] != "some translated text" {
-		t.Fatalf("expected whole text forwarded on non-JSON response, got %v", got)
-	}
-}
-
 func TestValidator_IgnoresEmptyChunks(t *testing.T) {
-	srv := newSegmentationServer(t, []string{
-		segResponse([]string{"Real content."}, ""),
-	})
-	v, in, out := newTestValidator(t, srv.URL)
+	v, in, out := newTestValidator(t)
 
 	got := runValidator(t, v, out, func() {
 		in.Ch <- "   "
@@ -202,23 +145,22 @@ func TestValidator_IgnoresEmptyChunks(t *testing.T) {
 	}
 }
 
-func TestExtractJSON(t *testing.T) {
-	cases := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{"plain", `{"a":1}`, `{"a":1}`},
-		{"fenced", "```json\n{\"a\":1}\n```", `{"a":1}`},
-		{"prose", `Sure! {"a":1} done`, `{"a":1}`},
-		{"none", `no braces here`, `no braces here`},
-		{"nested", `{"a":{"b":2}}`, `{"a":{"b":2}}`},
+func TestValidator_SafetyValveFlushesLongUnpunctuatedBuffer(t *testing.T) {
+	v, in, out := newTestValidator(t)
+
+	// A run of words that never terminates a sentence must still be flushed once
+	// it crosses maxBufferedWords, rather than stalling until the stream closes.
+	words := make([]byte, 0, maxBufferedWords*5)
+	for i := 0; i < maxBufferedWords+5; i++ {
+		words = append(words, []byte("word ")...)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := extractJSON(tc.in); got != tc.want {
-				t.Fatalf("extractJSON(%q) = %q, want %q", tc.in, got, tc.want)
-			}
-		})
+
+	got := runValidator(t, v, out, func() {
+		in.Ch <- string(words)
+		in.Close()
+	})
+
+	if len(got) == 0 {
+		t.Fatal("expected long unpunctuated buffer to be flushed by the safety valve")
 	}
 }
